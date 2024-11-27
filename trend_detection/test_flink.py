@@ -6,8 +6,8 @@ from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.state import ValueState
 from datetime import datetime
 
-# Import your modules
-from run_flink import PreProcessingMapFunction, TrendDetectionProcessor
+from processors.trend_detection_processor import TrendDetectionProcessor
+from run_flink import PreProcessingMapFunction
 from trend_detection_embeddings import TrendDetectorEmbeddings, TREND_CREATED, Trend, TrendEvent
 
 @pytest.fixture
