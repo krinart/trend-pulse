@@ -1,0 +1,97 @@
+<div id="map"></div>
+  
+
+<div id="topics-container">
+  <div *ngFor="let topic of currentTopics" (click)="onTopicClick(topic.topicEnum)" [class.selected]="checkTopicSelected(topic.topicEnum)">
+    <div>
+      <span>
+        <mat-icon>{{getTopicIcon(topic.topicEnum)}}</mat-icon>
+        {{topic.name}}
+      </span>
+      <mat-icon 
+        [matBadge]="getTopicLocalTrendsCount(topic.topicEnum)" 
+        *ngIf="getTopicLocalTrendsCount(topic.topicEnum) > 0"
+        matBadgeSize="small">home</mat-icon>
+      <mat-icon 
+        [matBadge]="getTopicGlobalTrendsCount(topic.topicEnum)" 
+        *ngIf="getTopicGlobalTrendsCount(topic.topicEnum) > 0" 
+        matBadgeSize="small">public</mat-icon>
+    </div>
+  </div>
+</div>
+
+<div id="selected-location-container" *ngIf="selectedLocationId">
+  Location: {{getLocationName(selectedLocationId)}}
+  <mat-icon (click)="resetLocation()">cancel</mat-icon>
+</div>
+
+<div id="trends-container">
+  <div class="title">
+    <mat-icon>public</mat-icon>
+    <span>Global Trends ({{filteredGlobalTrends.length}})</span>
+  </div>
+  <div class="trends-list">
+
+    <div 
+      *ngFor="let trend of filteredGlobalTrends" 
+      (click)="onTrendClick(trend)" 
+      class="trend-wrap"
+      [class.selected]="checkTrendSelected(trend)">
+      
+      <mat-icon>{{getTopicIcon(trend.topic)}}</mat-icon>
+      <span>{{trend.name}}</span>
+    
+    </div>
+
+  </div>
+
+  <div class="title">
+    <mat-icon>home</mat-icon>
+    <span>Local Trends ({{filteredLocalTrends.length}})</span>
+  </div>
+  <div class="trends-list">
+
+  <div 
+    *ngFor="let trend of filteredLocalTrends" 
+    (click)="onTrendClick(trend)" 
+    class="trend-wrap"
+    [class.selected]="checkTrendSelected(trend)">
+    
+    <mat-icon>{{getTopicIcon(trend.topic)}}</mat-icon>
+    <span>{{trend.name}}</span>
+  </div>
+
+  </div>
+</div>
+
+
+<div id="timeline-container">
+
+  <div class="icon-wrap">
+    <mat-icon [class.disabled]="sliderDisabled">schedule</mat-icon>
+  </div>
+
+  <div id="timeseries-container">
+
+    <div id="trend-chart">
+      <canvas></canvas>
+    </div>
+
+    <input 
+      id="slider"
+      type="range" 
+      [min]="0" 
+      [max]="sliderMaxValue"
+      [(ngModel)]="sliderCurrentValue"
+      [step]="1" 
+      (input)="onSliderInput($event)"
+      [class.disabled]="sliderDisabled"
+      [disabled]="sliderDisabled"
+    />
+  </div>
+
+  <div *ngIf="sliderDisabled" class="info-label" style=" ">
+    Select Trend to Display Timeline
+  </div>
+ 
+</div>

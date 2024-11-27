@@ -1,0 +1,3 @@
+docker-compose exec jobmanager /opt/venv/bin/python test_flink.py
+docker exec -ti ds2-taskmanager-1 /bin/bash
+docker-compose build --no-cache

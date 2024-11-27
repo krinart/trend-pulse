@@ -1,0 +1,60 @@
+/* You can add global styles to this file, and also import other style files */
+
+.marker {
+    //background: cyan;
+    //border: 2px solid #666;
+    //border-radius: 50%;
+    padding: 10px;
+    min-width: 100px;
+    text-align: center;
+    cursor: pointer;
+    position: absolute;
+    //z-index: 2;
+    //display: flex;
+    font-weight: bold;
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* space between icons */
+    font-size: 15px;
+}
+
+.icon-with-badge {
+    position: relative;
+    display: inline-block;
+}
+
+.badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: red;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 12px;
+    min-width: 16px;
+    text-align: center;
+}
+
+.material-icons {
+    font-size: 24px;
+}
+
+.popup-content {
+    padding: 10px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 999;
+}
+
+/* Style the Mapbox popup container */
+.mapboxgl-popup {
+    max-width: 200px;
+    z-index: 3 !important;
+}
+
+.mapboxgl-popup-content {
+    padding: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}

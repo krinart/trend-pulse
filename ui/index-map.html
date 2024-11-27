@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitter Trends Map</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.15.0/mapbox-gl.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.15.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 60px; bottom: 0; width: 100%; }
+        #topics {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+        .topic-btn {
+            padding: 8px 16px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .topic-btn:hover {
+            background: #f0f0f0;
+        }
+        .topic-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        #trend-list {
+            position: absolute;
+            top: 70px;
+            right: 10px;
+            width: 300px;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+            display: none;
+            z-index: 1;
+        }
+        .trend-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .trend-item:hover {
+            background: #f5f5f5;
+        }
+        .trend-item.active {
+            background: #007bff;
+            color: white;
+        }
+        .marker {
+            background: white;
+            border: 2px solid #666;
+            border-radius: 50%;
+            padding: 10px;
+            min-width: 100px;
+            text-align: center;
+            cursor: pointer;
+        }
+        #legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1;
+            display: none;
+        }
+        .legend-gradient {
+            width: 200px;
+            height: 20px;
+            margin: 5px 0;
+            background: linear-gradient(to right, rgba(0,0,255,0), rgba(0,0,255,1));
+        }
+    </style>
+</head>
+<body>
+    <div id="topics">
+        <div class="topic-btn" data-topic="sports">Sports <span>(5)</span></div>
+        <div class="topic-btn" data-topic="politics">Politics <span>(3)</span></div>
+        <div class="topic-btn" data-topic="entertainment">Entertainment <span>(4)</span></div>
+        <div class="topic-btn" data-topic="finance">Finance <span>(2)</span></div>
+    </div>
+    <div id="map"></div>
+    <div id="trend-list"></div>
+    <div id="legend">
+        <strong>Trend Intensity</strong>
+        <div class="legend-gradient"></div>
+        <div style="display: flex; justify-content: space-between">
+            <span>Low</span>
+            <span>High</span>
+        </div>
+    </div>
+
+    <script>
+        // Replace with your access token
+        mapboxgl.accessToken = 'pk.eyJ1Ijoia3JpbmFydCIsImEiOiJjbTNocGk4bzkwamw4MmtxMmgxbml6M3p3In0.kuos_MirrbMB46W84RJTqQ';
+
+        // Enhanced sample data with intensity values
+        const cityData = [
+            {
+                name: 'New York',
+                coordinates: [-74.006, 40.7128],
+                globalTrends: 3,
+                localTrends: 2,
+                trends: {
+                    sports: [
+                        { name: '#Yankees', intensity: 0.9 },
+                        { name: '#NBA', intensity: 0.7 },
+                        { name: '#NFLDraft', intensity: 0.8 }
+                    ],
+                    politics: [
+                        { name: '#NYPolitics', intensity: 0.6 },
+                        { name: '#CityCouncil', intensity: 0.4 }
+                    ],
+                    entertainment: [
+                        { name: '#Broadway', intensity: 0.8 },
+                        { name: '#NYCNightlife', intensity: 0.5 }
+                    ],
+                    finance: [
+                        { name: '#WallStreet', intensity: 0.9 },
+                        { name: '#NYSE', intensity: 0.7 }
+                    ]
+                },
+                topicIntensity: {
+                    sports: 0.8,
+                    politics: 0.6,
+                    entertainment: 0.7,
+                    finance: 0.9
+                }
+            },
+            {
+                name: 'Los Angeles',
+                coordinates: [-118.2437, 34.0522],
+                globalTrends: 2,
+                localTrends: 3,
+                trends: {
+                    sports: [
+                        { name: '#Lakers', intensity: 0.8 },
+                        { name: '#Dodgers', intensity: 0.7 }
+                    ],
+                    politics: [
+                        { name: '#CAGov', intensity: 0.5 }
+                    ],
+                    entertainment: [
+                        { name: '#Hollywood', intensity: 0.9 },
+                        { name: '#Oscars', intensity: 0.8 }
+                    ],
+                    finance: [
+                        { name: '#TechStocks', intensity: 0.6 }
+                    ]
+                },
+                topicIntensity: {
+                    sports: 0.7,
+                    politics: 0.5,
+                    entertainment: 0.9,
+                    finance: 0.6
+                }
+            },
+            {
+                name: 'Chicago',
+                coordinates: [-87.6298, 41.8781],
+                globalTrends: 2,
+                localTrends: 1,
+                trends: {
+                    sports: [
+                        { name: '#Bulls', intensity: 0.6 },
+                        { name: '#Cubs', intensity: 0.7 }
+                    ],
+                    politics: [
+                        { name: '#ChiPolitics', intensity: 0.4 }
+                    ],
+                    entertainment: [
+                        { name: '#Lollapalooza', intensity: 0.6 }
+                    ],
+                    finance: [
+                        { name: '#Trading', intensity: 0.5 }
+                    ]
+                },
+                topicIntensity: {
+                    sports: 0.6,
+                    politics: 0.4,
+                    entertainment: 0.6,
+                    finance: 0.5
+                }
+            }
+        ];
+
+        // Initialize map
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [-98.5795, 39.8283],
+            zoom: 3
+        });
+
+        // Add markers for each city
+        cityData.forEach(city => {
+            const el = document.createElement('div');
+            el.className = 'marker';
+            el.innerHTML = `${city.name}<br>${city.globalTrends} global, ${city.localTrends} local`;
+
+            el.addEventListener('click', () => {
+                showCityTrends(city);
+                map.flyTo({
+                    center: city.coordinates,
+                    zoom: 10
+                });
+            });
+
+            new mapboxgl.Marker({ element: el })
+                .setLngLat(city.coordinates)
+                .addTo(map);
+        });
+
+        // Handle topic selection
+        document.querySelectorAll('.topic-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const topic = e.currentTarget.dataset.topic;
+                document.querySelectorAll('.topic-btn').forEach(b => b.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                showTopicTrends(topic);
+            });
+        });
+
+        function generateHeatmapPoints(data, type, filter = null) {
+            let points = [];
+            const basePoints = 20; // Number of points to generate around each city
+
+            data.forEach(city => {
+                let intensity;
+                if (type === 'topic') {
+                    intensity = city.topicIntensity[filter];
+                } else if (type === 'trend') {
+                    const trend = Object.values(city.trends)
+                        .flat()
+                        .find(t => t.name === filter);
+                    intensity = trend ? trend.intensity : 0;
+                }
+
+                // Generate points in a circle around the city
+                for (let i = 0; i < basePoints; i++) {
+                    const angle = (i / basePoints) * 2 * Math.PI;
+                    const radius = 0.5 * Math.random(); // Random radius up to 0.5 degrees
+                    const lng = city.coordinates[0] + radius * Math.cos(angle);
+                    const lat = city.coordinates[1] + radius * Math.sin(angle);
+                    
+                    points.push({
+                        'type': 'Feature',
+                        'properties': {
+                            'intensity': intensity * (0.5 + Math.random() * 0.5) // Add some randomness
+                        },
+                        'geometry': {
+                            'type': 'Point',
+                            'coordinates': [lng, lat]
+                        }
+                    });
+                }
+            });
+
+            return points;
+        }
+
+        function showTopicTrends(topic) {
+            const trendList = document.getElementById('trend-list');
+            trendList.style.display = 'block';
+            document.getElementById('legend').style.display = 'block';
+            
+            // Collect all trends for this topic
+            let trends = [];
+            cityData.forEach(city => {
+                if (city.trends[topic]) {
+                    trends = [...trends, ...city.trends[topic]];
+                }
+            });
+            
+            // Remove duplicates and sort by intensity
+            trends = Array.from(new Set(trends.map(t => t.name)))
+                .map(name => {
+                    const trend = trends.find(t => t.name === name);
+                    return trend;
+                })
+                .sort((a, b) => b.intensity - a.intensity);
+            
+            trendList.innerHTML = `
+                <h3>${topic.charAt(0).toUpperCase() + topic.slice(1)} Trends</h3>
+                ${trends.map(trend => `
+                    <div class="trend-item" onclick="showTrendHeatmap('${trend.name}')">
+                        ${trend.name} (Intensity: ${(trend.intensity * 100).toFixed(0)}%)
+                    </div>
+                `).join('')}
+            `;
+
+            // Add topic heatmap
+            addHeatmapLayer(generateHeatmapPoints(cityData, 'topic', topic));
+        }
+
+        function showCityTrends(city) {
+            const trendList = document.getElementById('trend-list');
+            trendList.style.display = 'block';
+            document.getElementById('legend').style.display = 'block';
+            
+            // Collect all trends with their intensities
+            let allTrends = [];
+            Object.values(city.trends).forEach(trends => {
+                allTrends = [...allTrends, ...trends];
+            });
+
+            // Sort by intensity
+            allTrends.sort((a, b) => b.intensity - a.intensity);
+
+            trendList.innerHTML = `
+                <h3>${city.name} Trends</h3>
+                ${allTrends.map(trend => `
+                    <div class="trend-item" onclick="showTrendHeatmap('${trend.name}')">
+                        ${trend.name} (Intensity: ${(trend.intensity * 100).toFixed(0)}%)
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function showTrendHeatmap(trendName) {
+            document.querySelectorAll('.trend-item').forEach(item => {
+                item.classList.toggle('active', item.textContent.includes(trendName));
+            });
+            
+            addHeatmapLayer(generateHeatmapPoints(cityData, 'trend', trendName));
+        }
+
+        function addHeatmapLayer(points) {
+            // Remove existing heatmap
+            if (map.getLayer('trend-heat')) {
+                map.removeLayer('trend-heat');
+            }
+            if (map.getSource('trend-data')) {
+                map.removeSource('trend-data');
+            }
+
+            // Add the new heatmap layer
+            map.addSource('trend-data', {
+                'type': 'geojson',
+                'data': {
+                    'type': 'FeatureCollection',
+                    'features': points
+                }
+            });
+
+            map.addLayer({
+                'id': 'trend-heat',
+                'type': 'heatmap',
+                'source': 'trend-data',
+                'paint': {
+                    'heatmap-weight': ['get', 'intensity'],
+                    'heatmap-intensity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 1,
+                        9, 3
+                    ],
+                    'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0, 'rgba(0, 0, 255, 0)',
+                        0.2, 'rgba(0, 0, 255, 0.2)',
+                        0.4, 'rgba(0, 0, 255, 0.4)',
+                        0.6, 'rgba(0, 0, 255, 0.6)',
+                        0.8, 'rgba(0, 0, 255, 0.8)',
+                        1, 'rgba(0, 0, 255, 1)'
+                    ],
+                    'heatmap-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 2,
+                        9, 20
+                    ],
+                    'heatmap-opacity': 0.8
+                }
+            });
+        }
+
+        map.on('load', () => {
+            // Initialize with sports topic selected
+            document.querySelector('[data-topic="sports"]').click();
+        });
+    </script>
+</body>
+</html>

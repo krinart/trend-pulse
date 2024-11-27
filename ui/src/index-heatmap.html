@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>A Week in US</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        #controls-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50px;
+            width: 80%;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 10px;
+            border-radius: 4px;
+        }
+        #slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        #play-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        button {
+            padding: 5px 15px;
+            border: none;
+            border-radius: 4px;
+            background: #4a4a4a;
+            color: white;
+            cursor: pointer;
+            font-family: Arial, sans-serif;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #666;
+        }
+        #speed-control {
+            margin-left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #trends-controls-container {
+          position: absolute;
+          top: 30px;
+            left: 50px;
+            width: 80%;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div id="trends-controls-container">
+        <div fxLayout="row">
+          <div fxLayout="column">1</div>
+          <div fxLayout="column">2</div>
+        </div>
+    </div>
+
+    <div id="controls-container">
+        <input id="slider" type="range" min="0" max="30" value="0" step="1" />
+        <!-- <div id="date-display">Loading...</div> -->
+        <!-- <div id="count-display"></div> -->
+        <div id="play-controls">
+            <button id="play-pause">Play</button>
+            <button id="reset">Reset</button>
+            <div id="speed-control">
+                <label for="speed">Speed:</label>
+                <select id="speed">
+                    <option value="1000">1x</option>
+                    <option value="500">2x</option>
+                    <option value="250">4x</option>
+                    <option value="125">8x</option>
+                </select>
+            </div>
+
+            <button id="zoom-in">Zoom In</button>
+            <button id="zoom-out">Zoom Out</button>
+
+        </div>
+    </div>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1Ijoia3JpbmFydCIsImEiOiJjbTNocGk4bzkwamw4MmtxMmgxbml6M3p3In0.kuos_MirrbMB46W84RJTqQ';
+
+        const MAP_CENTER = [-95.5795, 37.8283];
+        const DEFAULT_ZOM = 3.5;
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: MAP_CENTER,
+            zoom: DEFAULT_ZOM,
+            // dragPan: false,
+            renderWorldCopies: false,
+            // scrollZoom: false,  // Disables mouse wheel/trackpad zooming
+            // doubleClickZoom: false,  // Disables double click zooming
+        });
+
+        let earthquakeData = null;
+        let animationFrame = null;
+        let isPlaying = false;
+
+        // Define start and end dates
+        const startDate = new Date('2017-09-08');
+        const endDate = new Date('2017-10-06');
+        const dayCount = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+
+        function formatDate(date) {
+            const options = { month: 'long', day: 'numeric', year: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        }
+
+        function getDateFromSlider(sliderValue) {
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + parseInt(sliderValue));
+            return date;
+        }
+
+        function isSameDay(date1, date2) {
+            return date1.getFullYear() === date2.getFullYear() &&
+                   date1.getMonth() === date2.getMonth() &&
+                   date1.getDate() === date2.getDate();
+        }
+
+        // Animation controls
+        let lastTime = 0;
+        const slider = document.getElementById('slider');
+        const playPauseButton = document.getElementById('play-pause');
+        const resetButton = document.getElementById('reset');
+        const speedSelect = document.getElementById('speed');
+
+        const zoomInButton = document.getElementById('zoom-in');
+        const zoomOutButton = document.getElementById('zoom-out');
+
+        function animate(currentTime) {
+            if (!lastTime) lastTime = currentTime;
+            const deltaTime = currentTime - lastTime;
+
+            if (deltaTime >= parseInt(speedSelect.value)) {
+                let currentValue = parseInt(slider.value);
+                if (currentValue >= parseInt(slider.max)) {
+                    stopAnimation();
+                } else {
+                    slider.value = currentValue + 1;
+                    updateMapForDay(slider.value);
+                    lastTime = currentTime;
+                }
+            }
+
+            if (isPlaying) {
+                animationFrame = requestAnimationFrame(animate);
+            }
+        }
+
+        function startAnimation() {
+            if (!isPlaying) {
+                isPlaying = true;
+                playPauseButton.textContent = 'Pause';
+                lastTime = 0;
+                animationFrame = requestAnimationFrame(animate);
+            }
+        }
+
+        function stopAnimation() {
+            if (isPlaying) {
+                isPlaying = false;
+                playPauseButton.textContent = 'Play';
+                if (animationFrame) {
+                    cancelAnimationFrame(animationFrame);
+                }
+            }
+        }
+
+        function resetAnimation() {
+            stopAnimation();
+            slider.value = 0;
+            updateMapForDay(0);
+        }
+
+        playPauseButton.addEventListener('click', () => {
+            if (isPlaying) {
+                stopAnimation();
+            } else {
+                if (parseInt(slider.value) >= parseInt(slider.max)) {
+                    slider.value = 0;
+                }
+                startAnimation();
+            }
+        });
+
+        resetButton.addEventListener('click', resetAnimation);
+
+        zoomInButton.addEventListener('click', () => {
+            map.easeTo({
+              center: [-122.3321, 47.6],
+              zoom: map.getZoom() + 4.6,
+              duration: 1000, // Animation duration in milliseconds
+              // easing: (t) => t * (2 - t) // Ease-out quadratic function
+            });
+        });
+
+        zoomOutButton.addEventListener('click', () => {
+            map.easeTo({
+              center: MAP_CENTER,
+              zoom: DEFAULT_ZOM,
+              duration: 1000, // Animation duration in milliseconds
+              // easing: (t) => t * (2 - t) // Ease-out quadratic function
+            });
+        });
+
+        map.on('load', () => {
+
+          map.setLayoutProperty('country-label', 'visibility', 'none');
+          map.setLayoutProperty('state-label', 'visibility', 'none');
+          // map.setLayoutProperty('settlement-label', 'visibility', 'none');
+
+          map.addSource('country-boundaries', {
+            type: 'vector',
+            url: 'mapbox://mapbox.country-boundaries-v1'
+          });
+
+          map.addLayer({
+            id: 'country-boundaries',
+            type: 'fill',
+            source: 'country-boundaries',
+            'source-layer': 'country_boundaries',
+            paint: {
+              'fill-color': 'gray',
+              'fill-opacity': 1
+            },
+            filter: ['!=', ['get', 'iso_3166_1'], 'US']
+          });
+        });
+
+        // fetch('assets/data/seattle-points.geojson')
+        fetch('assets/data/aggregated-seattle-points.geojson')
+            .then(response => response.json())
+            .then(data => {
+              
+                console.log(data);
+
+                map.addSource('message-points', {
+                    type: 'geojson',
+                    data: data
+                });
+
+                map.addLayer({
+                    id: 'heatmap',
+                    type: 'heatmap',
+                    source: 'message-points',
+                    paint: {
+                      // Increase the heatmap weight based on frequency and property intensity
+                      'heatmap-weight': [
+                      'interpolate',
+                      ['linear'],
+                      ['get', 'intensity'],
+                      0, 0,
+                      1, 1  // This maps the intensity range 0-1 to weight range 0-10
+                    ],
+                      
+                      // Color ramp for heatmap. Domain is 0 (low) to 1 (high)
+                      'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0, 'rgba(255,0,0,0)',
+                        0.2, 'rgba(255,195,155,0.8)',  // Light orange-red
+                        0.4, 'rgba(255,165,120,0.8)',  // Orange-red
+                        0.6, 'rgba(255,95,85,0.8)',    // Bright red
+                        0.8, 'rgba(255,45,45,0.8)',    // Strong red
+                        1, 'rgba(178,0,0,0.8)'         // Dark red
+                      ],
+
+                      // Increase the heatmap color weight by zoom level
+                      // Heatmap-intensity is a multiplier on top of heatmap-weight
+                      'heatmap-intensity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 1,
+                        20, 30
+                      ],
+                      
+                      // Adjust the heatmap radius by zoom level
+                      'heatmap-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 1,
+                        10, 80,
+                        20, 500
+                      ],
+
+                      // 'heatmap-radius': [
+                      //   'interpolate',
+                      //   ['exponential', 2],  // exponential scaling factor
+                      //   ['zoom'],
+                      //   5, 2,    // at zoom level 5, radius is 2px
+                      //   10, 32,  // at zoom level 10, radius is 32px
+                      //   15, 512  // at zoom level 15, radius is 512px
+                      // ],
+                      
+                      // Opacity
+                      'heatmap-opacity': 0.9
+                    }
+                  });
+
+            });
+
+
+        // fetch('https://docs.mapbox.com/mapbox-gl-js/assets/earthquakes.geojson')
+        //     .then(response => response.json())
+        //     .then(data => {
+        //       return;
+        //         data.features = data.features.map(feature => {
+        //             const date = new Date(feature.properties.time);
+        //             return {
+        //                 ...feature,
+        //                 properties: {
+        //                     ...feature.properties,
+        //                     date: date
+        //                 }
+        //             };
+        //         });
+
+        //         earthquakeData = data;
+        //         initializeMap(data);
+        //         updateMapForDay(0);
+        //     });
+
+        function getEarthquakeCountForDay(sliderValue) {
+            const targetDate = getDateFromSlider(sliderValue);
+            return earthquakeData.features.filter(feature =>
+                isSameDay(feature.properties.date, targetDate)
+            ).length;
+        }
+
+        function initializeMap(data) {
+            map.addSource('earthquakes', {
+                type: 'geojson',
+                data: data
+            });
+
+            map.addLayer({
+                id: 'earthquakes-heat',
+                type: 'heatmap',
+                source: 'earthquakes',
+                paint: {
+                    'heatmap-weight': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'mag'],
+                        //2, 0, 8, 1
+                        0, 0, 6, 1
+                    ],
+                    'heatmap-intensity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 1,
+                        9, 3
+                    ],
+                    'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0, 'rgba(33,102,172,0)',
+                        0.2, 'rgb(103,169,207)',
+                        0.4, 'rgb(209,229,240)',
+                        0.6, 'rgb(253,219,199)',
+                        0.8, 'rgb(239,138,98)',
+                        1, 'rgb(178,24,43)'
+                    ],
+                    /*'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0, 'rgba(236,222,239,0)',
+                        0.2, 'rgb(208,209,230)',
+                        0.4, 'rgb(166,189,219)',
+                        0.6, 'rgb(103,169,207)',
+                        0.8, 'rgb(28,144,153)',
+                        1, 'rgb(1,108,89)'
+                    ],*/
+                    'heatmap-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 10,
+                        9, 50
+                    ],
+                    'heatmap-opacity': 1
+                }
+            });
+        }
+
+        function updateMapForDay(sliderValue) {
+            if (!earthquakeData) return;
+
+            const currentDate = getDateFromSlider(sliderValue);
+            const filteredData = {
+                type: 'FeatureCollection',
+                features: earthquakeData.features.filter(feature =>
+                    isSameDay(feature.properties.date, currentDate)
+                )
+            };
+
+            map.getSource('earthquakes').setData(filteredData);
+
+            // const dateDisplay = document.getElementById('date-display');
+            // const countDisplay = document.getElementById('count-display');
+            // dateDisplay.textContent = formatDate(currentDate);
+            // countDisplay.textContent = `Earthquakes: ${getEarthquakeCountForDay(sliderValue)}`;
+        }
+
+        slider.addEventListener('input', (e) => {
+            stopAnimation();
+            updateMapForDay(parseInt(e.target.value));
+        });
+    </script>
+</body>
+</html>
