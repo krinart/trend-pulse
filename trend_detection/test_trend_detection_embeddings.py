@@ -1,12 +1,17 @@
 import pytest
 import time
+
+from sentence_transformers import SentenceTransformer
+
 from trend_detection_embeddings import TrendDetectorEmbeddings, Message, Trend
 
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
 class TestTrendDetectorEmbeddings:
    @pytest.fixture
    def detector(self):
-       return TrendDetectorEmbeddings(window_minutes=5)
+       return TrendDetectorEmbeddings(model=model, window_minutes=5, cluster_min_samples=2)
 
    def test_basic_trend_detection(self, detector):
        current_time = time.time()
@@ -23,6 +28,7 @@ class TestTrendDetectorEmbeddings:
        for msg in messages:
            detector.process_message(msg, "LA", current_time)
            
+       import ipdb; ipdb.set_trace()
        detector.detect_trends(current_time)
        assert len(detector.trends) == 1
        
