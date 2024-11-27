@@ -1,3 +1,11 @@
-docker-compose exec jobmanager /opt/venv/bin/python test_flink.py
+
 docker exec -ti trend_detection-jobmanager-1 /bin/bash
 docker-compose build --no-cache
+
+
+Local mode:
+docker-compose exec jobmanager /opt/venv/bin/python test_flink.py
+
+
+Cluster mode:
+docker-compose exec jobmanager flink run -py run_flink.py

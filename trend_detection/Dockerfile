@@ -16,6 +16,8 @@ ENV VIRTUAL_ENV=/opt/venv
 RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
+ENV NLTK_DATA=/opt/venv/nltk_data
+
 # Install Apache Flink Python API and other dependencies in virtualenv
 RUN . /etc/profile && \
     pip install --no-cache-dir --upgrade pip && \
@@ -26,10 +28,11 @@ RUN . /etc/profile && \
     pip install --no-cache-dir nltk==3.9.1 && \
     pip install --no-cache-dir huggingface-hub==0.26.2 && \
     pip install --no-cache-dir sentence-transformers==3.3.1 && \
-    python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('punkt_tab'); nltk.download('wordnet')"
+    python -c "import nltk; nltk.download('punkt', download_dir='/opt/venv/nltk_data'); nltk.download('stopwords', download_dir='/opt/venv/nltk_data'); nltk.download('punkt_tab', download_dir='/opt/venv/nltk_data'); nltk.download('wordnet', download_dir='/opt/venv/nltk_data')"
+
 
 WORKDIR /opt/flink/work
-COPY test_flink.py .
+COPY run_flink.py .
 
 # Make sure we use the virtualenv by default
 ENV VIRTUAL_ENV=/opt/venv

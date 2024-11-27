@@ -68,7 +68,7 @@ class PreProcessingMapFunction(MapFunction):
 
 
 def main():
-    data = json.load(open('data/trend_messages_v23.json'))
+    data = json.load(open('data/trend_messages_v23.json'))[:100]
 
     env = StreamExecutionEnvironment.get_execution_environment()
     
