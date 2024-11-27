@@ -66,14 +66,12 @@ class TestPreProcessingMapFunction:
 class TestStatefulProcessor:
     def test_initialization(self):
         processor = TrendDetectionProcessor()
-        assert processor.message_count is None
         assert processor.td is None
     
     def test_open(self, mock_runtime_context):
         processor = TrendDetectionProcessor()
         processor.open(mock_runtime_context)
         
-        assert processor.message_count is not None
         assert isinstance(processor.td, TrendDetectorEmbeddings)
         
         mock_runtime_context.get_state.assert_called_once()
@@ -83,11 +81,9 @@ class TestStatefulProcessor:
         processor = TrendDetectionProcessor()
         processor.open(mock_runtime_context)
         
-        # Create mock context for process_element
         ctx = Mock()
         ctx.get_current_key.return_value = 1
         
-        # Create sample input
         input_row = Row(
             text="test message",
             timestamp=datetime.now().isoformat(),
@@ -97,14 +93,8 @@ class TestStatefulProcessor:
             d_location_id=1
         )
         
-        # Process element and collect results
         results = list(processor.process_element(input_row, ctx))
         
-        # Verify state was updated
-        processor.message_count.update.assert_called_once_with(1)
-        
-        # If no trends were detected, results should be empty
-        # If trends were detected, verify the output format
         for result in results:
             assert isinstance(result, Row)
             assert hasattr(result, 'trend_event')
@@ -118,7 +108,6 @@ class _TestIntegration:
     def test_end_to_end_flow(self, sample_data):
         env = StreamExecutionEnvironment.get_execution_environment()
         
-        # Create data stream from sample data
         data_stream = env.from_collection(
             collection=sample_data,
             type_info=Types.ROW_NAMED(
@@ -127,7 +116,6 @@ class _TestIntegration:
             )
         )
         
-        # Apply transformations
         result_stream = data_stream.map(
             PreProcessingMapFunction(),
             output_type=Types.ROW_NAMED(
@@ -145,7 +133,6 @@ class _TestIntegration:
             )
         )
         
-        # Execute and verify no exceptions are raised
         try:
             env.execute('Test Flink Job')
         except Exception as e:
