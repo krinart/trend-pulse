@@ -1,4 +1,6 @@
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Set, Dict
 import logging
 import time
@@ -10,8 +12,8 @@ from sklearn.cluster import DBSCAN
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-
 import preprocessing
+import utils
 
 
 logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
@@ -22,9 +24,24 @@ class Message:
     id: str
     text: str
     timestamp: float
+    lat: float
+    lon: float
     embedding: np.ndarray
     debug_trend_id: int = None
     debug_location_id: int = None
+
+    @classmethod
+    def new(cls, text: str, timestamp: str, lat, lon, embedding, debug_location_id=None, debug_trend_id=None):
+        return cls(
+            id = str(uuid.uuid4()), 
+            text = text, 
+            timestamp = datetime.fromisoformat(timestamp), 
+            lat=lat,
+            lon=lon,
+            embedding = embedding, 
+            debug_location_id=debug_location_id,
+            debug_trend_id=debug_trend_id,
+        )
 
 
 @dataclass 
@@ -37,6 +54,8 @@ class Trend:
     last_update: float
     original_messages_cnt: int
     matched_messages_cnt: int
+    stats: Dict
+
     debug_trend_ids: Set[int]
     debug_location_ids: Set[int]
 
@@ -75,14 +94,15 @@ class TrendDetectorEmbeddings:
         self.unprocessed_messages_count = 0
         self.unprocessed_messages_threshold = 20
        
-    def process_message(self, text: str, current_time: float, debug_location_id=None, debug_trend_id=None):
-        # Create message object
-        text = preprocessing.preprocess_text(text)
-
+    def process_message(self, text: str, timestamp: str, lat: float, lon: float, current_time: float, debug_location_id=None, debug_trend_id=None):
+        
         detected_trends = []
 
+        # Create message object
+        text = preprocessing.preprocess_text(text)
         embedding = self.model.encode([text])[0]
-        message = Message(str(uuid.uuid4()), text, current_time, embedding, debug_location_id=debug_location_id, debug_trend_id=debug_trend_id)
+        message = Message.new(
+            text, timestamp, lat, lon, embedding, debug_location_id=debug_location_id, debug_trend_id=debug_trend_id)
        
         # Clean old messages
         self.clean_window(current_time)
@@ -194,6 +214,7 @@ class TrendDetectorEmbeddings:
                     last_update=current_time,
                     original_messages_cnt=len(cluster_messages),
                     matched_messages_cnt=0,
+                    stats=self.initialize_trend_stats(cluster_messages),
                     debug_trend_ids=set(m.debug_trend_id for m in cluster_messages),
                     debug_location_ids=set(m.debug_location_id for m in cluster_messages),
                 )
@@ -202,8 +223,27 @@ class TrendDetectorEmbeddings:
 
         return detected_trends
                
+    def initialize_trend_stats(self, messages: List[Message]):
+        stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+
+        for message in messages:
+            self.update_stats_from_message(stats, message)
+
+        return stats
+
+    def update_stats_from_message(self, stats, message):
+        window_timestamp = utils.timestamp_to_window_start(
+            message.timestamp, self.window_minutes).isoformat()
+
+        for zoom in [3, 6, 9, 12]:
+            tile_lon, tile_lat = utils.lat_lon_to_tile(message.lat, message.lon, zoom)
+
+            stats[window_timestamp][zoom][(tile_lon, tile_lat)] += 1
+
     def update_trend(self, trend_id: str, message: Message):
         trend = self.trends[trend_id]
+
+        self.update_stats_from_message(trend.stats, message)
 
         # Update centroid
         n = len(trend.messages)  # need to track number of messages

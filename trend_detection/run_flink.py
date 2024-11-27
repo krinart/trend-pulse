@@ -28,6 +28,8 @@ class PreProcessingMapFunction(MapFunction):
         return Row(
             text=value.text,
             timestamp=value.timestamp,
+            lat=value.lat,
+            lon=value.lon,
             topic="ALL",
             location_id=location_id,
             d_trend_id=value.d_trend_id,
@@ -60,6 +62,9 @@ class StatefulProcessor(KeyedProcessFunction):
 
         events = self.td.process_message(
             value.text, 
+            value.timestamp,
+            value.lat,
+            value.lon,
             time.time(), 
             debug_trend_id=value.d_trend_id, 
             debug_location_id=value.d_location_id)
@@ -74,15 +79,15 @@ class StatefulProcessor(KeyedProcessFunction):
             )
 
 def main():
-    data = json.load(open('data/trend_messages_v23.json'))
+    data = json.load(open('data/trend_messages_v23.json'))[:100]
 
     env = StreamExecutionEnvironment.get_execution_environment()
     
     data_stream = env.from_collection(
         collection=data,
         type_info=Types.ROW_NAMED(
-            ['text', 'timestamp', 'lon', 'lat', 'd_trend_id', 'd_location_id'],
-            [Types.STRING(), Types.STRING(), Types.FLOAT(), Types.FLOAT(), Types.INT(), Types.INT()]
+            ['text',         'timestamp',    'lon',         'lat',         'd_trend_id', 'd_location_id'],
+            [Types.STRING(), Types.STRING(), Types.FLOAT(), Types.FLOAT(), Types.INT(),  Types.INT()]
         )
     )
 
@@ -90,8 +95,8 @@ def main():
     data_stream.map(
         PreProcessingMapFunction(),
         output_type=Types.ROW_NAMED(
-            ['text',         'timestamp',    'topic',        'location_id', 'd_trend_id', 'd_location_id'],
-            [Types.STRING(), Types.STRING(), Types.STRING(), Types.INT(),   Types.INT(),  Types.INT()]
+            ['text',         'timestamp',    'lon',         'lat',         'topic',        'location_id', 'd_trend_id', 'd_location_id'],
+            [Types.STRING(), Types.STRING(), Types.FLOAT(), Types.FLOAT(), Types.STRING(), Types.INT(),   Types.INT(),  Types.INT()]
         )
     ).key_by(
         lambda x: x.location_id,  # key by location,
