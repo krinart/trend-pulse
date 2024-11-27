@@ -36,7 +36,7 @@ class TestTrendDetectorEmbeddings:
        ]
         
        # Call the method
-       stats = detector.initialize_trend_stats(test_messages)
+       stats = detector.initialize_trend_stats(test_messages).stats
         
        # Verify the structure and counts
        window_timestamp = "2024-01-01T12:00:00"

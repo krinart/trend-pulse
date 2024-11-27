@@ -44,6 +44,27 @@ class Message:
         )
 
 
+class TrendStats(object):
+
+    def __init__(self, window_minutes):
+        self.window_minutes = window_minutes
+
+        # timestamp -> zoom -> (lat, lon) -> count
+        self.stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+        
+        # zoom -> macCount
+        self.maxValue = defaultdict(int)
+
+    def addMessage(self, timestamp, lat, lon):
+        window_timestamp = utils.timestamp_to_window_start(
+            timestamp, self.window_minutes).isoformat()
+
+        for zoom in [3, 6, 9, 12]:
+            tile_lon, tile_lat = utils.lat_lon_to_tile(lat, lon, zoom)
+
+            self.stats[window_timestamp][zoom][(tile_lon, tile_lat)] += 1
+
+
 @dataclass 
 class Trend:
     id: str
@@ -54,7 +75,7 @@ class Trend:
     last_update: float
     original_messages_cnt: int
     matched_messages_cnt: int
-    stats: Dict
+    stats: TrendStats
 
     debug_trend_ids: Set[int]
     debug_location_ids: Set[int]
@@ -224,26 +245,17 @@ class TrendDetectorEmbeddings:
         return detected_trends
                
     def initialize_trend_stats(self, messages: List[Message]):
-        stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+        stats = TrendStats(window_minutes=self.window_minutes)
 
-        for message in messages:
-            self.update_stats_from_message(stats, message)
+        for m in messages:
+            stats.addMessage(m.timestamp, m.lat, m.lon)
 
         return stats
-
-    def update_stats_from_message(self, stats, message):
-        window_timestamp = utils.timestamp_to_window_start(
-            message.timestamp, self.window_minutes).isoformat()
-
-        for zoom in [3, 6, 9, 12]:
-            tile_lon, tile_lat = utils.lat_lon_to_tile(message.lat, message.lon, zoom)
-
-            stats[window_timestamp][zoom][(tile_lon, tile_lat)] += 1
 
     def update_trend(self, trend_id: str, message: Message):
         trend = self.trends[trend_id]
 
-        self.update_stats_from_message(trend.stats, message)
+        trend.stats.addMessage(message.timestamp, message.lat, message.lon)
 
         # Update centroid
         n = len(trend.messages)  # need to track number of messages
