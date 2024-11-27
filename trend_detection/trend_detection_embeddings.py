@@ -23,6 +23,8 @@ class Message:
     text: str
     timestamp: float
     embedding: np.ndarray
+    debug_trend_id: int = None
+    debug_location_id: int = None
 
 
 @dataclass 
@@ -33,9 +35,10 @@ class Trend:
     centroid: np.ndarray
     created_at: float
     last_update: float
-    # locations: Set[str]
     original_messages_cnt: int
     matched_messages_cnt: int
+    debug_trend_ids: Set[int]
+    debug_location_ids: Set[int]
 
 
 TREND_CREATED = 'TREND_CREATED'
@@ -43,9 +46,8 @@ TREND_CREATED = 'TREND_CREATED'
 
 @dataclass
 class TrendEvent:
-    trend_id: int
     trend_event: int
-    trend_info: str
+    trend: Trend
 
 
 class TrendDetectorEmbeddings:
@@ -73,14 +75,14 @@ class TrendDetectorEmbeddings:
         self.unprocessed_messages_count = 0
         self.unprocessed_messages_threshold = 20
        
-    def process_message(self, text: str, current_time: float):
+    def process_message(self, text: str, current_time: float, debug_location_id=None, debug_trend_id=None):
         # Create message object
         text = preprocessing.preprocess_text(text)
 
         detected_trends = []
 
         embedding = self.model.encode([text])[0]
-        message = Message(str(uuid.uuid4()), text, current_time, embedding)
+        message = Message(str(uuid.uuid4()), text, current_time, embedding, debug_location_id=debug_location_id, debug_trend_id=debug_trend_id)
        
         # Clean old messages
         self.clean_window(current_time)
@@ -108,9 +110,8 @@ class TrendDetectorEmbeddings:
         for trend in detected_trends:
             events.append(
                 TrendEvent(
-                    trend_id=trend.id, 
                     trend_event=TREND_CREATED, 
-                    trend_info=', '.join(trend.keywords),
+                    trend=trend, 
             ))
         return events
            
@@ -191,9 +192,10 @@ class TrendDetectorEmbeddings:
                     centroid=cluster_centroid,
                     created_at=current_time,
                     last_update=current_time,
-                    # locations=set(m.location for m in cluster_messages),
                     original_messages_cnt=len(cluster_messages),
                     matched_messages_cnt=0,
+                    debug_trend_ids=set(m.debug_trend_id for m in cluster_messages),
+                    debug_location_ids=set(m.debug_location_id for m in cluster_messages),
                 )
 
                 detected_trends.append(self.trends[trend_id])

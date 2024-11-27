@@ -20,6 +20,21 @@ def ignore_thread_error():
             thread._stop()
 
 
+class PreProcessingMapFunction(MapFunction):
+
+    def map(self, value):   
+        location_id = utils.find_nearest_location(value.lat, value.lon, ALL_LOCATIONS)
+
+        return Row(
+            text=value.text,
+            timestamp=value.timestamp,
+            topic="ALL",
+            location_id=location_id,
+            d_trend_id=value.d_trend_id,
+            d_location_id=value.d_location_id,
+        )
+
+
 class StatefulProcessor(KeyedProcessFunction):
     def __init__(self):
         self.message_count = None
@@ -43,40 +58,31 @@ class StatefulProcessor(KeyedProcessFunction):
         # Update state
         self.message_count.update(current_count + 1)
 
-        events = self.td.process_message(value.text, time.time())
+        events = self.td.process_message(
+            value.text, 
+            time.time(), 
+            debug_trend_id=value.d_trend_id, 
+            debug_location_id=value.d_location_id)
 
         for event in events:
             yield Row(
-                trend_id=event.trend_id,
                 trend_event=event.trend_event,
-                trend_info=event.trend_info,
+                trend_id=event.trend.id,
+                keywords=', '.join(event.trend.keywords),
                 location_id=ctx.get_current_key(),
+                info=f"location:{event.trend.debug_location_ids}; trends:{event.trend.debug_trend_ids}",
             )
 
-
-class PreProcessingMapFunction(MapFunction):
-
-
-    def map(self, value):   
-        location_id = utils.find_nearest_location(value.latitude, value.longitude, ALL_LOCATIONS)
-
-        return Row(
-            text=value.text,
-            topic="ALL",
-            location_id=location_id
-        )
-
-
 def main():
-    data = json.load(open('data/trend_messages_v23.json'))[:100]
+    data = json.load(open('data/trend_messages_v23.json'))
 
     env = StreamExecutionEnvironment.get_execution_environment()
     
     data_stream = env.from_collection(
         collection=data,
         type_info=Types.ROW_NAMED(
-            ['text', 'timestamp', 'longitude', 'latitude'],
-            [Types.STRING(), Types.STRING(), Types.FLOAT(), Types.FLOAT()]
+            ['text', 'timestamp', 'lon', 'lat', 'd_trend_id', 'd_location_id'],
+            [Types.STRING(), Types.STRING(), Types.FLOAT(), Types.FLOAT(), Types.INT(), Types.INT()]
         )
     )
 
@@ -84,17 +90,17 @@ def main():
     data_stream.map(
         PreProcessingMapFunction(),
         output_type=Types.ROW_NAMED(
-            ['text', 'topic', 'location_id'],
-            [Types.STRING(), Types.STRING(), Types.INT()]
+            ['text',         'timestamp',    'topic',        'location_id', 'd_trend_id', 'd_location_id'],
+            [Types.STRING(), Types.STRING(), Types.STRING(), Types.INT(),   Types.INT(),  Types.INT()]
         )
     ).key_by(
-        lambda x: x[2],  # key by location,
+        lambda x: x.location_id,  # key by location,
         key_type=Types.INT(),
     ).process(
         StatefulProcessor(),
         output_type=Types.ROW_NAMED(
-            ['trend_id', 'trend_event', 'trend_info', 'location_id'],
-            [Types.STRING(), Types.STRING(), Types.STRING(), Types.INT()]
+            ['trend_event', 'trend_id', 'keywords', 'location_id', 'info'],
+            [Types.STRING(), Types.STRING(), Types.STRING(), Types.INT(), Types.STRING()]
         )
     ).print()
     

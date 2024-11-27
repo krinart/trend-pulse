@@ -107,6 +107,7 @@ export class MapComponent implements OnInit, OnDestroy {
       const zoom = Math.floor(this.map.getZoom());
       if (this.selectedLocationId !== undefined && this.selectedTrend == undefined && zoom < 6) {
         this.selectedLocationId = undefined;
+        this.updateTrends();
         this.showMarkers();
       }
     });
