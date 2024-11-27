@@ -37,7 +37,7 @@ class PreProcessingMapFunction(MapFunction):
         )
 
 
-class StatefulProcessor(KeyedProcessFunction):
+class TrendDetectionProcessor(KeyedProcessFunction):
     def __init__(self):
         self.message_count = None
         self.td = None
@@ -102,7 +102,7 @@ def main():
         lambda x: x.location_id,  # key by location,
         key_type=Types.INT(),
     ).process(
-        StatefulProcessor(),
+        TrendDetectionProcessor(),
         output_type=Types.ROW_NAMED(
             ['trend_event', 'trend_id', 'keywords', 'location_id', 'info'],
             [Types.STRING(), Types.STRING(), Types.STRING(), Types.INT(), Types.STRING()]
