@@ -8,6 +8,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import uuid
 
+import logging
+logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
+
+
+import preprocessing
 
 @dataclass
 class Message:
@@ -29,8 +34,19 @@ class Trend:
     locations: Set[str]
     original_messages_cnt: int
     matched_messages_cnt: int
-    
 
+
+TREND_CREATED = 'TREND_CREATED'
+
+
+@dataclass
+class TrendEvent:
+    trend_id: int
+    trend_event: int
+    trend_info: str
+
+
+    
 
 class TrendDetectorEmbeddings:
     def __init__(self, model=None, window_minutes=5, cluster_min_samples=10, cluster_eps=0.7):
@@ -59,6 +75,10 @@ class TrendDetectorEmbeddings:
        
     def process_message(self, text: str, location: str, current_time: float):
         # Create message object
+        text = preprocessing.preprocess_text(text)
+
+        detected_trends = []
+
         embedding = self.model.encode([text])[0]
         message = Message(str(uuid.uuid4()), text, current_time, location, embedding)
        
@@ -69,19 +89,30 @@ class TrendDetectorEmbeddings:
         matched_trend = self.match_to_trend(message)
         if matched_trend:
             self.update_trend(matched_trend, message)
-            return matched_trend
         else:
             # Add to window
             self.messages[message.id] = message
            
         # Periodically look for new trends
         if current_time - self.last_clustering > self.clustering_interval or self.unprocessed_messages_count >= self.unprocessed_messages_threshold:
-            self.detect_trends(current_time)
+            detected_trends = self.detect_trends(current_time)
             self.last_clustering = current_time
             self.unprocessed_messages_count = 0
         else:
             self.unprocessed_messages_count += 1
 
+        return self.create_events(detected_trends)
+
+    def create_events(self, detected_trends):
+        events = []
+        for trend in detected_trends:
+            events.append(
+                TrendEvent(
+                    trend_id=trend.id, 
+                    trend_event=TREND_CREATED, 
+                    trend_info=', '.join(trend.keywords),
+            ))
+        return events
            
     def clean_window(self, current_time: float):
         return
@@ -104,10 +135,10 @@ class TrendDetectorEmbeddings:
         return None
        
     def detect_trends(self, current_time: float):
-        # print('detect trends')
+        detected_trends = []
 
         if len(self.messages) < self.cluster_min_samples:
-            return
+            return []
            
         # Get embeddings matrix
         messages = self.messages.values()
@@ -147,10 +178,11 @@ class TrendDetectorEmbeddings:
                 # Create new trend
                 keywords = self.extract_keywords(cluster_messages)
                 trend_id = f"trend_{int(current_time)}_{'_'.join(keywords)}"
-                print(f"New Trend created: {', '.join(keywords)}")
+                # print(f"New Trend created: {', '.join(keywords)}")
                
                 # for m in cluster_messages:
                 #     del self.messages[m.id]
+
 
                 self.trends[trend_id] = Trend(
                     id=trend_id,
@@ -162,7 +194,11 @@ class TrendDetectorEmbeddings:
                     locations=set(m.location for m in cluster_messages),
                     original_messages_cnt=len(cluster_messages),
                     matched_messages_cnt=0,
-               )
+                )
+
+                detected_trends.append(self.trends[trend_id])
+
+        return detected_trends
                
     def update_trend(self, trend_id: str, message: Message):
         trend = self.trends[trend_id]
@@ -180,6 +216,8 @@ class TrendDetectorEmbeddings:
         # Periodically update keywords
         if len(trend.messages) % 10 == 0:  # every 10 messages
             trend.keywords = self.extract_keywords(trend.messages)
+
+        return []
            
     def extract_keywords(self, messages: List[Message], top_n=5) -> List[str]:
         texts = [m.text for m in messages]

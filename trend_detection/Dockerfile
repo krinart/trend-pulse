@@ -24,7 +24,8 @@ RUN . /etc/profile && \
     pip install --no-cache-dir apache-beam==2.48.0 && \
     pip install --no-cache-dir apache-flink==1.20.0 && \
     pip install --no-cache-dir nltk==3.9.1 && \
-    pip install --no-cache-dir sentence-transformers==2.2.2 && \
+    pip install --no-cache-dir huggingface-hub==0.26.2 && \
+    pip install --no-cache-dir sentence-transformers==3.3.1 && \
     python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('punkt_tab'); nltk.download('wordnet')"
 
 WORKDIR /opt/flink/work
