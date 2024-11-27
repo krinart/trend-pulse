@@ -1,18 +1,21 @@
 from dataclasses import dataclass
 from typing import List, Set, Dict
+import logging
 import time
+import uuid
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import DBSCAN
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import uuid
-
-import logging
-logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
 
 
 import preprocessing
+
+
+logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
+
 
 @dataclass
 class Message:
@@ -45,8 +48,6 @@ class TrendEvent:
     trend_event: int
     trend_info: str
 
-
-    
 
 class TrendDetectorEmbeddings:
     def __init__(self, model=None, window_minutes=5, cluster_min_samples=10, cluster_eps=0.7):

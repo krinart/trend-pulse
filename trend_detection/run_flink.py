@@ -1,13 +1,16 @@
+import json
+import time
+import threading
+
 from pyflink.common import Types, Row
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.functions import KeyedProcessFunction, MapFunction, RuntimeContext
 from pyflink.datastream.state import ValueStateDescriptor
+
+import utils
+from locations import ALL_LOCATIONS
 from preprocessing import preprocess_text
 from trend_detection_embeddings import TrendDetectorEmbeddings
-
-import json
-import time
-import threading
 
 
 def ignore_thread_error():
@@ -51,16 +54,22 @@ class StatefulProcessor(KeyedProcessFunction):
 
 
 class PreProcessingMapFunction(MapFunction):
+
+
     def map(self, value):   
+        lat=34.0522
+        lon=-118.2437
+        location_id = utils.find_nearest_location(float(lat), float(lon), ALL_LOCATIONS)
+
         return Row(
             text=value.text,
             topic="ALL",
-            location=1
+            location=location_id
         )
 
 
 def main():
-    data = json.load(open('data/local_events_messages_3.json'))
+    data = json.load(open('data/local_events_messages_3.json'))[:10]
 
     env = StreamExecutionEnvironment.get_execution_environment()
     
