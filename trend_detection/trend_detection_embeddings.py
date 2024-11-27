@@ -46,23 +46,29 @@ class Message:
 
 class TrendStats(object):
 
-    def __init__(self, window_minutes):
+    def __init__(self, window_minutes, zooms=[3, 6, 9, 12]):
         self.window_minutes = window_minutes
+        self.zooms = zooms
 
         # timestamp -> zoom -> (lat, lon) -> count
         self.stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
         
         # zoom -> macCount
-        self.maxValue = defaultdict(int)
+        self.zoomMaxValue = defaultdict(int)
 
     def addMessage(self, timestamp, lat, lon):
         window_timestamp = utils.timestamp_to_window_start(
             timestamp, self.window_minutes).isoformat()
 
-        for zoom in [3, 6, 9, 12]:
+        for zoom in self.zooms:
             tile_lon, tile_lat = utils.lat_lon_to_tile(lat, lon, zoom)
 
             self.stats[window_timestamp][zoom][(tile_lon, tile_lat)] += 1
+
+            self.zoomMaxValue[zoom] = max(
+                self.zoomMaxValue[zoom], 
+                self.stats[window_timestamp][zoom][(tile_lon, tile_lat)]
+            )
 
 
 @dataclass 
