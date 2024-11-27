@@ -43,13 +43,14 @@ class StatefulProcessor(KeyedProcessFunction):
         # Update state
         self.message_count.update(current_count + 1)
 
-        events = self.td.process_message(value.text, "LA", time.time())
+        events = self.td.process_message(value.text, time.time())
 
         for event in events:
             yield Row(
                 trend_id=event.trend_id,
                 trend_event=event.trend_event,
                 trend_info=event.trend_info,
+                location_id=ctx.get_current_key(),
             )
 
 
@@ -57,35 +58,33 @@ class PreProcessingMapFunction(MapFunction):
 
 
     def map(self, value):   
-        lat=34.0522
-        lon=-118.2437
-        location_id = utils.find_nearest_location(float(lat), float(lon), ALL_LOCATIONS)
+        location_id = utils.find_nearest_location(value.latitude, value.longitude, ALL_LOCATIONS)
 
         return Row(
             text=value.text,
             topic="ALL",
-            location=location_id
+            location_id=location_id
         )
 
 
 def main():
-    data = json.load(open('data/local_events_messages_3.json'))[:10]
+    data = json.load(open('data/trend_messages_v23.json'))
 
     env = StreamExecutionEnvironment.get_execution_environment()
     
     data_stream = env.from_collection(
         collection=data,
         type_info=Types.ROW_NAMED(
-            ['text'],
-            [Types.STRING()]
+            ['text', 'timestamp', 'longitude', 'latitude'],
+            [Types.STRING(), Types.STRING(), Types.FLOAT(), Types.FLOAT()]
         )
     )
-    
+
     # Add transformations
     data_stream.map(
         PreProcessingMapFunction(),
         output_type=Types.ROW_NAMED(
-            ['text', 'topic', 'location'],
+            ['text', 'topic', 'location_id'],
             [Types.STRING(), Types.STRING(), Types.INT()]
         )
     ).key_by(
@@ -94,8 +93,8 @@ def main():
     ).process(
         StatefulProcessor(),
         output_type=Types.ROW_NAMED(
-            ['trend_id', 'trend_event', 'trend_info'],
-            [Types.STRING(), Types.STRING(), Types.STRING()]
+            ['trend_id', 'trend_event', 'trend_info', 'location_id'],
+            [Types.STRING(), Types.STRING(), Types.STRING(), Types.INT()]
         )
     ).print()
     

@@ -22,7 +22,6 @@ class Message:
     id: str
     text: str
     timestamp: float
-    location: str
     embedding: np.ndarray
 
 
@@ -34,7 +33,7 @@ class Trend:
     centroid: np.ndarray
     created_at: float
     last_update: float
-    locations: Set[str]
+    # locations: Set[str]
     original_messages_cnt: int
     matched_messages_cnt: int
 
@@ -74,14 +73,14 @@ class TrendDetectorEmbeddings:
         self.unprocessed_messages_count = 0
         self.unprocessed_messages_threshold = 20
        
-    def process_message(self, text: str, location: str, current_time: float):
+    def process_message(self, text: str, current_time: float):
         # Create message object
         text = preprocessing.preprocess_text(text)
 
         detected_trends = []
 
         embedding = self.model.encode([text])[0]
-        message = Message(str(uuid.uuid4()), text, current_time, location, embedding)
+        message = Message(str(uuid.uuid4()), text, current_time, embedding)
        
         # Clean old messages
         self.clean_window(current_time)
@@ -192,7 +191,7 @@ class TrendDetectorEmbeddings:
                     centroid=cluster_centroid,
                     created_at=current_time,
                     last_update=current_time,
-                    locations=set(m.location for m in cluster_messages),
+                    # locations=set(m.location for m in cluster_messages),
                     original_messages_cnt=len(cluster_messages),
                     matched_messages_cnt=0,
                 )
@@ -211,7 +210,7 @@ class TrendDetectorEmbeddings:
         # trend.centroid = new_centroid
         trend.messages.append(message)
         trend.last_update = message.timestamp
-        trend.locations.add(message.location)
+        # trend.locations.add(message.location)
         trend.matched_messages_cnt += 1
 
         # Periodically update keywords

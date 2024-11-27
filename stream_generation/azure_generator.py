@@ -1,7 +1,7 @@
 from openai import AzureOpenAI
 from typing import List, Dict, Any
 
-from events import Event
+from stream_generation.trends import Trend
 
 
 class AzureContentGenerator:
@@ -24,7 +24,7 @@ class AzureContentGenerator:
         self.deployment_name = deployment_name
         self.temperature = temperature
 
-    def _generate_base_content(self, event: Event) -> str:
+    def _generate_base_content(self, trend: Trend) -> str:
         """Generate base content using Azure OpenAI"""
         system_prompt = """
         You are a social media user. Pick ONE random approach:
@@ -47,7 +47,7 @@ class AzureContentGenerator:
         Group 4:
         "Interesting how..."
         "Makes sense given..."
-        "Traffic stopped at..."
+        "This really made me think that..."
         
         Match the STYLE of your chosen approach and NEVER mention which one you chose.
         
@@ -63,11 +63,11 @@ class AzureContentGenerator:
         user_prompt = f"""
         Generate a single social media post based on:
 
-        Event: {event.event_name}
-        Details: {event.details}
-        Impact: {event.impact}
-        Engagement: {event.engagement}
-        Keywords: {event.keywords}
+        Event: {trend.name}
+        Details: {trend.details}
+        Impact: {trend.impact}
+        Engagement: {trend.engagement}
+        Keywords: {trend.keywords}
         """
 
         response = self.openai_client.chat.completions.create(
@@ -82,20 +82,21 @@ class AzureContentGenerator:
 
         return response.choices[0].message.content.strip()
 
-    def generate_message(self, event) -> Dict[str, Any]:
+    def generate_message(self, trend) -> Dict[str, Any]:
         """Generate a complete message with analysis"""
 
         # Generate content
-        text = self._generate_base_content(event)
+        text = self._generate_base_content(trend)
 
         return {
-            'event_name': event.event_name,
-            'category': event.category,
+            'trend_id': trend.id,
+            'trend_name': trend.name,
+            'topic': trend.topic,
             'text': text,
         }
 
     def generate_batch(self,
-                       event: Event,
+                       trend: Trend,
                        batch_size: int,
                        max_retries: int = 3) -> List[Dict[str, Any]]:
         """Generate a batch of messages with retry logic"""
@@ -105,7 +106,7 @@ class AzureContentGenerator:
             retries = 0
             while retries < max_retries:
                 try:
-                    message = self.generate_message(event)
+                    message = self.generate_message(trend)
                     messages.append(message)
                     break
                 except Exception as e:
