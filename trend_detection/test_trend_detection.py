@@ -5,7 +5,7 @@ import pytz
 
 from sentence_transformers import SentenceTransformer
 
-from trend_detection_embeddings import TrendDetectorEmbeddings, Message, Trend
+from trend_detection import TrendDetectorEmbeddings, Message, Trend
 
 
 model = SentenceTransformer('all-MiniLM-L6-v2')

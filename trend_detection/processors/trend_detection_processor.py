@@ -7,7 +7,7 @@ from pyflink.common import Types, Row
 from pyflink.datastream.functions import KeyedProcessFunction, RuntimeContext
 from pyflink.datastream.state import ValueStateDescriptor
 
-from trend_detection_embeddings import TrendDetectorEmbeddings
+from trend_detection import TrendDetectorEmbeddings
 import utils
 
 
