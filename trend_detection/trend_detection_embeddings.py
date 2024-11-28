@@ -14,7 +14,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 import preprocessing
 import utils
-from trend_stats import TrendStats
+from trend_stats import TrendStatsGrid
 
 
 logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
@@ -29,7 +29,7 @@ class Message:
     lon: float
     embedding: np.ndarray
     debug_trend_id: int = None
-    debug_location_id: int = None
+    debug_location_id: int = None   
 
     @classmethod
     def new(cls, text: str, timestamp: str, lat, lon, embedding, debug_location_id=None, debug_trend_id=None):
@@ -55,7 +55,7 @@ class Trend:
     last_update: float
     original_messages_cnt: int
     matched_messages_cnt: int
-    stats: TrendStats
+    stats: TrendStatsGrid
 
     debug_trend_ids: Set[int]
     debug_location_ids: Set[int]
@@ -205,7 +205,7 @@ class TrendDetectorEmbeddings:
         return detected_trends
           
     def initialize_trend_stats(self, messages: List[Message]):
-        stats = TrendStats(window_minutes=self.window_minutes)
+        stats = TrendStatsGrid(window_minutes=self.window_minutes)
 
         for m in messages:
             stats.add_message(m.timestamp, m.lat, m.lon)

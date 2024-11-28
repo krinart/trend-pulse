@@ -72,3 +72,19 @@ def lat_lon_to_tile(lat: float, lon: float, zoom: int) -> Tuple[int, int]:
     x = max(0, min(int(n - 1), x))
     y = max(0, min(int(n - 1), y))
     return x, y
+
+
+def meters_to_degrees(meters: float) -> Tuple[float, float]:
+    """Convert meters to approximate degrees for lat/lon"""
+    # Earth's radius in meters
+    earth_radius = 6371000
+    
+    # 1 degree latitude is approximately 111km
+    lat_degrees = (meters / 111000)
+    
+    # 1 degree longitude varies with latitude
+    # At equator it's 111km, at poles it's 0
+    # Using 111km as approximation - if needed can make it lat-dependent
+    lon_degrees = (meters / 111000)
+    
+    return lat_degrees, lon_degrees

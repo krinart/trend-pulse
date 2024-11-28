@@ -95,6 +95,10 @@ class TrendDetectionProcessor(KeyedProcessFunction):
                 'window_start': window_start.isoformat(),
                 'window_end': window_end.isoformat(),
                 'stats': trend.get_timestamp_stats(window_start),
+                'debug': {
+                    'location_ids': list(trend.debug_location_ids - {None}),
+                    'trend_ids': list(trend.debug_trend_ids - {None})
+                }
             }
 
             yield Row(
