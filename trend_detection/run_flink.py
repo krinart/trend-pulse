@@ -13,6 +13,8 @@ from pyflink.datastream.state import ValueStateDescriptor
 import utils
 from locations import ALL_LOCATIONS
 from processors.trend_detection_processor import TrendDetectionProcessor
+from processors.output import TrendStatsRouter, TimeseriesWriter, TileWriter
+
 
 def ignore_thread_error():
     """Ignore the specific GRPC error in the read_grpc_client_inputs thread"""
@@ -51,6 +53,8 @@ def main():
     # assert False, [d['timestamp'] for d in data]
 
     env = StreamExecutionEnvironment.get_execution_environment()
+
+    output_path = "./output"
     
     data_stream = env.from_collection(
         collection=data,
@@ -65,7 +69,7 @@ def main():
     )
 
     # Add transformations
-    data_stream.map(
+    processed_stream = data_stream.map(
         PreProcessingMapFunction(),
         output_type=Types.ROW_NAMED(
             ['text',         'timestamp',    'lon',         'lat',         'topic',        'location_id', 'd_trend_id', 'd_location_id'],
@@ -80,7 +84,17 @@ def main():
             ['event_type',   'trend_id',     'location_id', 'event_info'],
             [Types.STRING(), Types.STRING(), Types.INT(),   Types.STRING()]
         )
-    ).print()
+    )
+
+    # Create and apply router
+    stats_router = TrendStatsRouter(output_path)
+    routed_stream = processed_stream.process(stats_router)
+    
+    timeseries_stream = routed_stream.get_side_output(stats_router.timeseries_output)
+    timeseries_stream.process(TimeseriesWriter(output_path))
+    
+    tile_stream = routed_stream.get_side_output(stats_router.tile_output)
+    tile_stream.process(TileWriter(output_path))
     
     env.execute('Stateful Flink Job')
     ignore_thread_error()
