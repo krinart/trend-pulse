@@ -43,20 +43,6 @@ class PreProcessingMapFunction(MapFunction):
             d_location_id=value.d_location_id,
         )
 
-from pyflink.datastream import WindowAssigner
-from pyflink.datastream.window import TumblingEventTimeWindows, TimeWindow
-from pyflink.datastream.functions import WindowFunction
-from pyflink.common.time import Time
-# Window function to count events
-class CountWindowFunction(WindowFunction):
-    def apply(self, key: int, window: TimeWindow, inputs: list):
-        yield Row(
-            location_id=key,
-            window_start=datetime.fromtimestamp(window.start),
-            window_end=datetime.fromtimestamp(window.end),
-            count=len(inputs)
-        )
-
 
 def main():
     window_minutes = 60
@@ -77,23 +63,6 @@ def main():
             .for_bounded_out_of_orderness(Duration.of_seconds(5))
             .with_timestamp_assigner(MessageTimestampAssigner())
     )
-
-    # data_stream \
-    #     .map(
-    #         PreProcessingMapFunction(),
-    #         output_type=Types.ROW_NAMED(
-    #             ['text',         'timestamp',    'lon',         'lat',         'topic',        'location_id', 'd_trend_id', 'd_location_id'],
-    #             [Types.STRING(), Types.STRING(), Types.FLOAT(), Types.FLOAT(), Types.STRING(), Types.INT(),   Types.INT(),  Types.INT()]
-    #         )) \
-    #     .key_by(lambda x: x.location_id) \
-    #     .window(TumblingEventTimeWindows.of(Time.seconds(5))) \
-    #     .apply(
-    #         CountWindowFunction(),
-    #         output_type=Types.ROW_NAMED(
-    #             ['location_id', 'window_start', 'window_end', 'count'],
-    #             [Types.INT(), Types.LONG(), Types.LONG(), Types.LONG()]
-    #         )
-    #     ).print()
 
     # Add transformations
     data_stream.map(
