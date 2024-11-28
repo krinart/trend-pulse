@@ -59,7 +59,7 @@ class CountWindowFunction(WindowFunction):
 
 
 def main():
-    window_minutes = 5
+    window_minutes = 60
     data = json.load(open('data/trend_messages_v23.json'))[:100]
 
     # assert False, [d['timestamp'] for d in data]
@@ -108,8 +108,8 @@ def main():
     ).process(
         TrendDetectionProcessor(window_minutes=window_minutes),
         output_type=Types.ROW_NAMED(
-            ['trend_event', 'trend_id', 'keywords', 'location_id', 'info'],
-            [Types.STRING(), Types.STRING(), Types.STRING(), Types.INT(), Types.STRING()]
+            ['event_type',   'trend_id',     'location_id', 'event_info'],
+            [Types.STRING(), Types.STRING(), Types.INT(),   Types.STRING()]
         )
     ).print()
     

@@ -53,13 +53,20 @@ class TrendDetectionProcessor(KeyedProcessFunction):
             debug_location_id=value.d_location_id)
 
         for trend in detected_trends:
-            print(f"detected: {trend.id}")
+            
+            event_info = {
+                'keywords': trend.keywords,
+                'debug': {
+                    'location_ids': list(trend.debug_location_ids - {None}),
+                    'trend_ids': list(trend.debug_trend_ids - {None})
+                }
+            }
+
             yield Row(
-                trend_event=TREND_CREATED,
+                event_type=TREND_CREATED,
                 trend_id=trend.id,
-                keywords=', '.join(trend.keywords),
                 location_id=ctx.get_current_key(),
-                info=f"location:{trend.debug_location_ids}; trends:{trend.debug_trend_ids}",
+                event_info=json.dumps(event_info),
             )
 
     def on_timer(self, timestamp: int, ctx: 'KeyedProcessFunction.OnTimerContext'):
@@ -84,11 +91,15 @@ class TrendDetectionProcessor(KeyedProcessFunction):
             
             # print(location_id, window_start, window_start.isoformat() in list(trend.stats.stats.keys()), json.dumps(stats))
 
+            event_info = {
+                'window_start': window_start.isoformat(),
+                'window_end': window_end.isoformat(),
+                'stats': trend.get_timestamp_stats(window_start),
+            }
+
             yield Row(
                 event_type=TREND_STATS,
-                location_id=location_id,
                 trend_id=trend.id,
-                window_start=window_start.isoformat(),
-                window_end=window_end.isoformat(),
-                stats=json.dumps(trend.get_timestamp_stats(window_start)),
+                location_id=location_id,
+                event_info=json.dumps(event_info),
             )
