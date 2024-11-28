@@ -50,14 +50,18 @@ class TrendStatsGrid:
         
         self.cells[window_ts][(cell_lat, cell_lon)].count += 1
 
-    def get_timestamp_stats(self, timestamp):
-        ts = timestamp.isoformat()
+    def get_window_stats(self, window_start):
+        ts = window_start.isoformat()
         if ts not in self.cells:
-            return None
+            return []
             
         result = []
+        total_count = 0
+
         grid_cells = list(self.cells[ts].values())
-        
+        for cell in grid_cells:
+            total_count += cell.count
+
         for zoom, max_points_per_tile in zip(self.zooms, self.max_points_per_tile):
             # Create tiles
             tiles = defaultdict(lambda: {'total_count': 0, 'points': []})
@@ -95,9 +99,11 @@ class TrendStatsGrid:
                     })
             
             result.append({
-                'timestamp': ts,
                 'zoom': zoom,
-                'stats': stats
+                'stats': stats,
             })
             
-        return result
+        return {
+            'count': total_count,
+            'stats': result,
+        }

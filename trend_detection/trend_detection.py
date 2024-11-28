@@ -60,8 +60,8 @@ class Trend:
     debug_trend_ids: Set[int]
     debug_location_ids: Set[int]
 
-    def get_timestamp_stats(self, window_ts):
-        return self.stats.get_timestamp_stats(window_ts)
+    def get_window_stats(self, window_start):
+        return self.stats.get_window_stats(window_start)
 
 
 class TrendDetectorEmbeddings:

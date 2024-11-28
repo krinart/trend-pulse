@@ -46,11 +46,14 @@ class TestTrendDetectorEmbeddings:
        assert list(stats.cells['2024-01-01T12:00:00+00:00'].keys()) == [(47.6036, -122.3333)]
        assert stats.cells['2024-01-01T12:00:00+00:00'][(47.6036, -122.3333)].count == 2
 
-       window_stats = stats.get_timestamp_stats(datetime.fromisoformat(window_timestamp))
-       assert window_stats[0] == {'timestamp': '2024-01-01T12:00:00+00:00', 'zoom': 3, 'stats': [{'tile_x': 1, 'tile_y': 2, 'total_count': 2, 'points_count': 1, 'sampled_points': [{'lat': 47.6036, 'lon': -122.3333, 'count': 2}]}]}
-       assert window_stats[1] == {'timestamp': '2024-01-01T12:00:00+00:00', 'zoom': 6, 'stats': [{'tile_x': 10, 'tile_y': 22, 'total_count': 2, 'points_count': 1, 'sampled_points': [{'lat': 47.6036, 'lon': -122.3333, 'count': 2}]}]}
-       assert window_stats[2] == {'timestamp': '2024-01-01T12:00:00+00:00', 'zoom': 9, 'stats': [{'tile_x': 82, 'tile_y': 178, 'total_count': 2, 'points_count': 1, 'sampled_points': [{'lat': 47.6036, 'lon': -122.3333, 'count': 2}]}]}
-       assert window_stats[3] == {'timestamp': '2024-01-01T12:00:00+00:00', 'zoom': 12, 'stats': [{'tile_x': 656, 'tile_y': 1430, 'total_count': 2, 'points_count': 1, 'sampled_points': [{'lat': 47.6036, 'lon': -122.3333, 'count': 2}]}]}
+       window_stats = stats.get_window_stats(datetime.fromisoformat(window_timestamp))
+       assert window_stats['count'] == 2
+
+       zoom_stats = window_stats['stats']
+       assert zoom_stats[0] == {'zoom': 3, 'stats': [{'tile_x': 1, 'tile_y': 2, 'total_count': 2, 'points_count': 1, 'sampled_points': [{'lat': 47.6036, 'lon': -122.3333, 'count': 2}]}]}
+       assert zoom_stats[1] == {'zoom': 6, 'stats': [{'tile_x': 10, 'tile_y': 22, 'total_count': 2, 'points_count': 1, 'sampled_points': [{'lat': 47.6036, 'lon': -122.3333, 'count': 2}]}]}
+       assert zoom_stats[2] == {'zoom': 9, 'stats': [{'tile_x': 82, 'tile_y': 178, 'total_count': 2, 'points_count': 1, 'sampled_points': [{'lat': 47.6036, 'lon': -122.3333, 'count': 2}]}]}
+       assert zoom_stats[3] == {'zoom': 12, 'stats': [{'tile_x': 656, 'tile_y': 1430, 'total_count': 2, 'points_count': 1, 'sampled_points': [{'lat': 47.6036, 'lon': -122.3333, 'count': 2}]}]}
 
    def test_basic_trend_detection(self, detector):
        current_time = time.time()

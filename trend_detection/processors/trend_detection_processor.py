@@ -85,16 +85,12 @@ class TrendDetectionProcessor(KeyedProcessFunction):
         # print(location_id, window_start, self.td.trends.keys())
 
         for trend in self.td.trends.values():
-            stats = trend.stats.get_timestamp_stats(window_start)
-            if not stats:
-                continue
-            
             # print(location_id, window_start, window_start.isoformat() in list(trend.stats.stats.keys()), json.dumps(stats))
 
             event_info = {
                 'window_start': window_start.isoformat(),
                 'window_end': window_end.isoformat(),
-                'stats': trend.get_timestamp_stats(window_start),
+                'stats': trend.stats.get_window_stats(window_start),
                 'debug': {
                     'location_ids': list(trend.debug_location_ids - {None}),
                     'trend_ids': list(trend.debug_trend_ids - {None})
