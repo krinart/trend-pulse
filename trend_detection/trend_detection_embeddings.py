@@ -14,6 +14,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 import preprocessing
 import utils
+from trend_stats import TrendStats
 
 
 logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
@@ -44,33 +45,6 @@ class Message:
         )
 
 
-class TrendStats(object):
-
-    def __init__(self, window_minutes, zooms=[3, 6, 9, 12]):
-        self.window_minutes = window_minutes
-        self.zooms = zooms
-
-        # timestamp -> zoom -> (lat, lon) -> count
-        self.stats = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
-        
-        # zoom -> macCount
-        self.zoomMaxValue = defaultdict(int)
-
-    def addMessage(self, timestamp, lat, lon):
-        window_timestamp = utils.timestamp_to_window_start(
-            timestamp, self.window_minutes).isoformat()
-
-        for zoom in self.zooms:
-            tile_lon, tile_lat = utils.lat_lon_to_tile(lat, lon, zoom)
-
-            self.stats[window_timestamp][zoom][(tile_lon, tile_lat)] += 1
-
-            self.zoomMaxValue[zoom] = max(
-                self.zoomMaxValue[zoom], 
-                self.stats[window_timestamp][zoom][(tile_lon, tile_lat)]
-            )
-
-
 @dataclass 
 class Trend:
     id: str
@@ -86,14 +60,8 @@ class Trend:
     debug_trend_ids: Set[int]
     debug_location_ids: Set[int]
 
-
-TREND_CREATED = 'TREND_CREATED'
-
-
-@dataclass
-class TrendEvent:
-    trend_event: int
-    trend: Trend
+    def get_timestamp_stats(self, window_ts):
+        return self.stats.get_timestamp_stats(window_ts)
 
 
 class TrendDetectorEmbeddings:
@@ -130,38 +98,24 @@ class TrendDetectorEmbeddings:
         embedding = self.model.encode([text])[0]
         message = Message.new(
             text, timestamp, lat, lon, embedding, debug_location_id=debug_location_id, debug_trend_id=debug_trend_id)
-       
-        # Clean old messages
+        
+        # TODO: think about it       
         self.clean_window(current_time)
        
-        # Try to match to existing trend
         matched_trend = self.match_to_trend(message)
         if matched_trend:
             self.update_trend(matched_trend, message)
         else:
-            # Add to window
             self.messages[message.id] = message
            
-        # Periodically look for new trends
+        self.unprocessed_messages_count += 1
         if current_time - self.last_clustering > self.clustering_interval or self.unprocessed_messages_count >= self.unprocessed_messages_threshold:
             detected_trends = self.detect_trends(current_time)
             self.last_clustering = current_time
             self.unprocessed_messages_count = 0
-        else:
-            self.unprocessed_messages_count += 1
 
-        return self.create_events(detected_trends)
+        return detected_trends
 
-    def create_events(self, detected_trends):
-        events = []
-        for trend in detected_trends:
-            events.append(
-                TrendEvent(
-                    trend_event=TREND_CREATED, 
-                    trend=trend, 
-            ))
-        return events
-           
     def clean_window(self, current_time: float):
         return
         cutoff = current_time - (self.window_minutes * 60)
@@ -249,19 +203,19 @@ class TrendDetectorEmbeddings:
                 detected_trends.append(self.trends[trend_id])
 
         return detected_trends
-               
+          
     def initialize_trend_stats(self, messages: List[Message]):
         stats = TrendStats(window_minutes=self.window_minutes)
 
         for m in messages:
-            stats.addMessage(m.timestamp, m.lat, m.lon)
+            stats.add_message(m.timestamp, m.lat, m.lon)
 
         return stats
 
     def update_trend(self, trend_id: str, message: Message):
         trend = self.trends[trend_id]
 
-        trend.stats.addMessage(message.timestamp, message.lat, message.lon)
+        trend.stats.add_message(message.timestamp, message.lat, message.lon)
 
         # Update centroid
         n = len(trend.messages)  # need to track number of messages

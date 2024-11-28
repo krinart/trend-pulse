@@ -1,6 +1,7 @@
 from datetime import datetime
 import pytest
 import time
+import pytz
 
 from sentence_transformers import SentenceTransformer
 
@@ -20,7 +21,7 @@ class TestTrendDetectorEmbeddings:
            Message(
               id="1",
               text="test message",
-              timestamp=datetime(2024, 1, 1, 12, 0),
+              timestamp=datetime(2024, 1, 1, 12, 0, tzinfo=pytz.UTC),
               lat=47.6062,  # Seattle coordinates
               lon=-122.3321,
               embedding=[],
@@ -28,7 +29,7 @@ class TestTrendDetectorEmbeddings:
            Message(
               id="2", 
               text="another message",
-              timestamp=datetime(2024, 1, 1, 12, 2),
+              timestamp=datetime(2024, 1, 1, 12, 2, tzinfo=pytz.UTC),
               lat=47.6062,  # Same location, different time
               lon=-122.3321,
               embedding=[],
@@ -39,15 +40,13 @@ class TestTrendDetectorEmbeddings:
        stats = detector.initialize_trend_stats(test_messages).stats
         
        # Verify the structure and counts
-       window_timestamp = "2024-01-01T12:00:00"
+       window_timestamp = "2024-01-01T12:00:00+00:00"
        assert window_timestamp in stats
         
-       assert set(stats['2024-01-01T12:00:00'].keys()) == {3, 6, 9, 12}
-
-       assert list(stats['2024-01-01T12:00:00'][3].items()) == [((1, 2), 2)]
-       assert list(stats['2024-01-01T12:00:00'][6].items()) == [((10, 22), 2)]
-       assert list(stats['2024-01-01T12:00:00'][9].items()) == [((82, 178), 2)]
-       assert list(stats['2024-01-01T12:00:00'][12].items()) == [((656, 1430), 2)]
+       assert list(stats['2024-01-01T12:00:00+00:00'][3].keys()) == [(1, 2)]
+       assert list(stats['2024-01-01T12:00:00+00:00'][6].keys()) == [(10, 22)]
+       assert list(stats['2024-01-01T12:00:00+00:00'][9].keys()) == [(82, 178)]
+       assert list(stats['2024-01-01T12:00:00+00:00'][12].keys()) == [(656, 1430)]
 
    def test_basic_trend_detection(self, detector):
        current_time = time.time()

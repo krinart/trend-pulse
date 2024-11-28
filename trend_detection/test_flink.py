@@ -8,7 +8,7 @@ from datetime import datetime
 
 from processors.trend_detection_processor import TrendDetectionProcessor
 from run_flink import PreProcessingMapFunction
-from trend_detection_embeddings import TrendDetectorEmbeddings, TREND_CREATED, Trend, TrendEvent
+from trend_detection_embeddings import TrendDetectorEmbeddings, Trend
 
 @pytest.fixture
 def sample_data():
@@ -92,7 +92,7 @@ class TestStatefulProcessor:
             d_trend_id=1,
             d_location_id=1
         )
-        
+
         results = list(processor.process_element(input_row, ctx))
         
         for result in results:
