@@ -30,10 +30,20 @@ public class TrendDetectionJob {
     static String PATH = "/Users/viktor/workspace/ds2/trend_detection/data/messages_rows.json";
 
     public static void main(String[] args) throws Exception {
+        int limit = 10;
+        if (args.length > 0) {
+            try {
+                limit = Integer.parseInt(args[0]);
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid limit argument, using default: " + limit);
+            }
+        } else {
+            System.out.println("No limit specified, using default: " + limit);
+        }
+
         List<String> lines = Files.readAllLines(Paths.get(PATH));
         
         // Optionally limit size
-        int limit = 10; // change this to your desired limit
         if (lines.size() > limit) {
             lines = lines.subList(0, limit);
         }
