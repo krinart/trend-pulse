@@ -2,4 +2,4 @@
 .venv/
 __pycache__/
 ui/static-data/data
-trend_detection/output
+trend_detection/output*

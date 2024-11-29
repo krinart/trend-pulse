@@ -1,0 +1,54 @@
+// File: TrendDetectionJob.java
+// package com.example.trendpulse;
+
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.util.Collector;
+import org.apache.flink.api.java.tuple.Tuple2;
+import java.time.Duration;
+import java.time.Instant;
+
+import org.apache.flink.connector.file.src.FileSource;
+import org.apache.flink.core.fs.Path;
+import org.apache.flink.connector.file.src.reader.TextLineInputFormat;
+import org.apache.flink.api.common.functions.MapFunction;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class TrendDetectionJob {
+    
+    static String PATH = "/Users/viktor/workspace/ds2/trend_detection/data/test.json";
+
+    public static void main(String[] args) throws Exception {
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        
+        final FileSource<String> source = FileSource
+            .forRecordStreamFormat(new TextLineInputFormat(), new Path(PATH))
+            .build();
+
+        final ObjectMapper mapper = new ObjectMapper();
+
+        DataStream<InputMessage> messages = env
+            .fromSource(
+                source,
+                WatermarkStrategy.noWatermarks(),
+                "JSON-File-Source"
+            ).map(new MapFunction<String, InputMessage>() {
+                @Override
+                public InputMessage map(String jsonLine) throws Exception {
+                    return mapper.readValue(jsonLine, InputMessage.class);
+                }
+            })
+            .name("JSON-Parser");
+
+
+        messages.print();
+
+        // Execute
+        env.execute("Trend Detection Job");
+    }
+}

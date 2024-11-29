@@ -53,7 +53,10 @@ class TrendStatsGrid:
     def get_window_stats(self, window_start):
         ts = window_start.isoformat()
         if ts not in self.cells:
-            return []
+            return {
+                'count': 0,
+                'geo_stats': [],
+            }
             
         result = []
         total_count = 0
@@ -105,5 +108,5 @@ class TrendStatsGrid:
             
         return {
             'count': total_count,
-            'stats': result,
+            'geo_stats': result,
         }

@@ -41,6 +41,8 @@ class TrendDetectionProcessor(KeyedProcessFunction):
             self.scheduled_windows.update(scheduled)
 
     def process_element(self, value, ctx: 'KeyedProcessFunction.Context'):
+        # print(f"Current watermark: {ctx.timer_service().current_watermark()}")
+
         self._schedule_window_end_callback(ctx, value.timestamp)
 
         detected_trends = self.td.process_message(
@@ -54,6 +56,8 @@ class TrendDetectionProcessor(KeyedProcessFunction):
 
         for trend in detected_trends:
             
+            # print(f"detected trend({value.timestamp}): {trend.id}, location: {ctx.get_current_key()}")
+
             event_info = {
                 'keywords': trend.keywords,
                 'debug': {
@@ -82,15 +86,15 @@ class TrendDetectionProcessor(KeyedProcessFunction):
         window_end = datetime.fromtimestamp(timestamp).replace(tzinfo=pytz.UTC)
         window_start = window_end - timedelta(minutes=self.window_minutes)
 
-        # print(location_id, window_start, self.td.trends.keys())
-
         for trend in self.td.trends.values():
-            # print(location_id, window_start, window_start.isoformat() in list(trend.stats.stats.keys()), json.dumps(stats))
+            window_stats = trend.stats.get_window_stats(window_start)
+
+            # print(f"on timer ({window_start}) trend: {trend.id}, count: {window_stats['count']}, location: {location_id}")
 
             event_info = {
                 'window_start': window_start.isoformat(),
                 'window_end': window_end.isoformat(),
-                'stats': trend.stats.get_window_stats(window_start),
+                'window_stats': window_stats,
                 'debug': {
                     'location_ids': list(trend.debug_location_ids - {None}),
                     'trend_ids': list(trend.debug_trend_ids - {None})

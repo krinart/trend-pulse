@@ -26,7 +26,8 @@ def ignore_thread_error():
 class MessageTimestampAssigner(TimestampAssigner):
    
     def extract_timestamp(self, message, record_timestamp):
-        return datetime.fromisoformat(message.timestamp).timestamp()
+        # print(message.timestamp, record_timestamp, int(datetime.fromisoformat(message.timestamp).timestamp() * 1000))
+        return int(datetime.fromisoformat(message.timestamp).timestamp())
 
 
 class PreProcessingMapFunction(MapFunction):
@@ -48,13 +49,11 @@ class PreProcessingMapFunction(MapFunction):
 
 def main():
     window_minutes = 60
-    data = json.load(open('data/trend_messages_v23.json'))[:100]
-
-    # assert False, [d['timestamp'] for d in data]
+    data = json.load(open('data/trend_messages_v23.json'))
 
     env = StreamExecutionEnvironment.get_execution_environment()
 
-    output_path = "./output"
+    output_path = "./output2"
     
     data_stream = env.from_collection(
         collection=data,

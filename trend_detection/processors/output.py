@@ -27,18 +27,19 @@ class TrendStatsRouter(ProcessFunction):
         if value.event_type != TREND_STATS:
             return
 
-        event_info = json.loads(value.event_info)
         trend_id = value.trend_id
+
+        event_info = json.loads(value.event_info)
         timestamp = event_info['window_start']
         
         timeseries_item = json.dumps({
             "timestamp": timestamp,
-            "count": event_info['stats']['count']
+            "count": event_info['window_stats']['count']
         })
         
         yield self.timeseries_output, (trend_id, timeseries_item)
 
-        for zoom_stats in event_info['stats']['stats']:
+        for zoom_stats in event_info['window_stats']['geo_stats']:
             zoom = zoom_stats['zoom']
             for tile in zoom_stats['stats']:
                 tile_x = tile['tile_x']

@@ -2,7 +2,7 @@ build:
 	docker-compose build --no-cache
 
 connect:
-	docker exec -ti trend_detection-jobmanager-1 /bin/bash
+	docker-compose exec jobmanager /bin/bash
 
 run:
 	docker-compose exec jobmanager /opt/venv/bin/python run_flink.py
