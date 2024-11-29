@@ -12,6 +12,7 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 
 import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.core.fs.Path;
@@ -24,6 +25,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
+
 
 public class TrendDetectionJob {
     
@@ -80,6 +82,8 @@ public class TrendDetectionJob {
                         message.getLat(), 
                         message.getLon()
                     );
+
+                    message.setDatetime(OffsetDateTime.parse(message.getTimestamp()));
                     
                     if (nearestLocationId != null) {
                         message.setLocationId(nearestLocationId);
@@ -89,8 +93,12 @@ public class TrendDetectionJob {
 
                 }
             })
-            .name("JSON-Parser");
-
+            .name("JSON-Parser")
+            .assignTimestampsAndWatermarks(
+                WatermarkStrategy
+                    .<InputMessage>forBoundedOutOfOrderness(Duration.ofSeconds(5))
+                    .withTimestampAssigner((event, timestamp) -> event.getDatetime().toInstant().toEpochMilli())
+            );
 
         // Transform and detect trends
         DataStream<TrendEvent> trendEvents = messages

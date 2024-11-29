@@ -1,4 +1,5 @@
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.OffsetDateTime;
 
 
 public class InputMessage {
@@ -11,6 +12,7 @@ public class InputMessage {
     private int locationID;
 
     private double[] embedding;
+    private OffsetDateTime datetime;
 
     @JsonProperty("d_trend_id")
     private int d_trend_id;
@@ -46,4 +48,7 @@ public class InputMessage {
 
     public String getPreProcessedText() { return preProcessedText; }
     public void setPreProcessedText(String preProcessedText) { this.preProcessedText = preProcessedText; }
+
+    public OffsetDateTime getDatetime() { return datetime; }
+    public void setDatetime(OffsetDateTime datetime) { this.datetime = datetime; }
 }
