@@ -1,12 +1,16 @@
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+
 public class InputMessage {
     private String topic;
     private String timestamp;
     private double lon;
     private double lat;
     private String text;
+    private String preProcessedText;
     private int locationID;
+
+    private double[] embedding;
 
     @JsonProperty("d_trend_id")
     private int d_trend_id;
@@ -36,4 +40,10 @@ public class InputMessage {
     
     public String getText() { return text; }
     public void setText(String text) { this.text = text; }
+
+    public double[] getEmbedding() { return embedding; }
+    public void setEmbedding(double[] embedding) { this.embedding = embedding; }
+
+    public String getPreProcessedText() { return preProcessedText; }
+    public void setPreProcessedText(String preProcessedText) { this.preProcessedText = preProcessedText; }
 }

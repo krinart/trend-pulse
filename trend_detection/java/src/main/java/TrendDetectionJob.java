@@ -30,6 +30,10 @@ public class TrendDetectionJob {
     static String PATH = "/Users/viktor/workspace/ds2/trend_detection/data/messages_rows.json";
 
     public static void main(String[] args) throws Exception {
+
+        TfidfKeywordExtractor keywordExtractor = new TfidfKeywordExtractor();
+
+
         int limit = 10;
         if (args.length > 0) {
             try {
@@ -78,7 +82,7 @@ public class TrendDetectionJob {
                     );
                     
                     if (nearestLocationId != null) {
-                        message.setDLocationId(nearestLocationId);
+                        message.setLocationId(nearestLocationId);
                     }
 
                     return message;
@@ -88,7 +92,16 @@ public class TrendDetectionJob {
             .name("JSON-Parser");
 
 
-        messages.print();
+        // Transform and detect trends
+        DataStream<TrendEvent> trendEvents = messages
+            .keyBy(message -> message.getLocationId())
+            .process(new TrendDetectionProcessor())
+            .name("trend-detection");
+
+
+        trendEvents
+            .map(event -> String.format("%s: %s", event.getEventType(), event.getEventInfo()))
+            .print();
 
         // Execute
         env.execute("Trend Detection Job");

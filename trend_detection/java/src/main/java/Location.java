@@ -19,4 +19,4 @@ public class Location {
     public double getLat() { return lat; }
     public double getLon() { return lon; }
     public String getName() { return name; }
-}
+}	
