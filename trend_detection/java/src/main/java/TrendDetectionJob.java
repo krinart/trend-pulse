@@ -19,11 +19,25 @@ import org.apache.flink.connector.file.src.reader.TextLineInputFormat;
 import org.apache.flink.api.common.functions.MapFunction;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+
 public class TrendDetectionJob {
     
-    static String PATH = "/Users/viktor/workspace/ds2/trend_detection/data/test.json";
+    static String PATH = "/Users/viktor/workspace/ds2/trend_detection/data/messages_rows.json";
 
     public static void main(String[] args) throws Exception {
+        List<String> lines = Files.readAllLines(Paths.get(PATH));
+        
+        // Optionally limit size
+        int limit = 10; // change this to your desired limit
+        if (lines.size() > limit) {
+            lines = lines.subList(0, limit);
+        }
+
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         
         final FileSource<String> source = FileSource
@@ -32,12 +46,18 @@ public class TrendDetectionJob {
 
         final ObjectMapper mapper = new ObjectMapper();
 
-        DataStream<InputMessage> messages = env
-            .fromSource(
-                source,
-                WatermarkStrategy.noWatermarks(),
-                "JSON-File-Source"
-            ).map(new MapFunction<String, InputMessage>() {
+        DataStream<String> input = env
+            .fromCollection(lines);
+
+        // DataStream<String> input = env
+        //     .fromSource(
+        //         source,
+        //         WatermarkStrategy.noWatermarks(),
+        //         "JSON-File-Source"
+        //     );
+
+        DataStream<InputMessage> messages = input
+            .map(new MapFunction<String, InputMessage>() {
                 @Override
                 public InputMessage map(String jsonLine) throws Exception {
                     InputMessage message = mapper.readValue(jsonLine, InputMessage.class);
