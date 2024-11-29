@@ -40,7 +40,19 @@ public class TrendDetectionJob {
             ).map(new MapFunction<String, InputMessage>() {
                 @Override
                 public InputMessage map(String jsonLine) throws Exception {
-                    return mapper.readValue(jsonLine, InputMessage.class);
+                    InputMessage message = mapper.readValue(jsonLine, InputMessage.class);
+
+                    Integer nearestLocationId = LocationUtils.findNearestLocation(
+                        message.getLat(), 
+                        message.getLon()
+                    );
+                    
+                    if (nearestLocationId != null) {
+                        message.setDLocationId(nearestLocationId);
+                    }
+
+                    return message;
+
                 }
             })
             .name("JSON-Parser");

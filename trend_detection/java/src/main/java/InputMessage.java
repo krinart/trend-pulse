@@ -6,6 +6,7 @@ public class InputMessage {
     private double lon;
     private double lat;
     private String text;
+    private int locationID;
 
     @JsonProperty("d_trend_id")
     private int d_trend_id;
@@ -17,6 +18,9 @@ public class InputMessage {
     
     public int getDLocationId() { return d_location_id; }
     public void setDLocationId(int d_location_id) { this.d_location_id = d_location_id; }
+
+    public int getLocationId() { return locationID; }
+    public void setLocationId(int locationID) { this.locationID = locationID; }
     
     public String getTopic() { return topic; }
     public void setTopic(String topic) { this.topic = topic; }
