@@ -80,13 +80,14 @@ public class TrendDetectionJob {
 
         String inputDataPath = cmd.getOptionValue("p", DEFAULT_DATA_PATH);
         
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
         // Log the configuration
         System.out.println("Running with configuration:");
         System.out.println("  Input path: " + inputDataPath);
         System.out.println("  Message limit: " + limit);
 
 
-        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         final ObjectMapper mapper = new ObjectMapper();
         DataStream<String> input;
 
@@ -141,7 +142,7 @@ public class TrendDetectionJob {
         // Transform and detect trends
         DataStream<TrendEvent> trendEvents = messages
             .keyBy(message -> message.getLocationId())
-            .process(new TrendDetectionProcessor(DEFAULT_SOCKET_PATH))
+            .process(new TrendDetectionProcessor())
             .name("trend-detection");
 
 

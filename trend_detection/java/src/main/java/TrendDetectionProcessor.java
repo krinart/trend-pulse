@@ -9,15 +9,18 @@ import java.util.HashMap;
 
 public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, InputMessage, TrendEvent> {
     private transient TrendDetector detector;
-    private String socketFilePath;
-
-    public TrendDetectionProcessor(String socketFilePath) {
-        this.socketFilePath = socketFilePath;
-    }
 
     @Override
     public void open(Configuration conf) throws Exception {
-        detector = new TrendDetector(this.socketFilePath);
+         // Get socket path from configuration
+        String socketPath = getRuntimeContext()
+            .getExecutionConfig()
+            .getGlobalJobParameters()
+            .toMap()
+            .getOrDefault("python.socket.path", "/tmp/embedding_server.sock")
+            .toString();
+
+        detector = new TrendDetector(socketPath);
     }
 
     @Override

@@ -8,7 +8,7 @@ from nltk.tokenize import word_tokenize
 import re
 import numpy as np
 
-SOCKET_PATH = '/tmp/embedding_server.sock'
+SOCKET_PATH = os.environ.get('SOCKET_PATH', '/tmp/embedding_server.sock')
 
 # Initialize the model globally
 model = SentenceTransformer('all-MiniLM-L6-v2')
