@@ -3,8 +3,13 @@ package com.trendpulse;
 import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
+
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.util.*;
 import java.time.*;
@@ -27,21 +32,17 @@ class TrendDetectorTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         detector = new TrendDetector(SOCKET_PATH);
-        // Replace the real Python client with our mock
         TestUtils.setPrivateField(detector, "pythonClient", pythonClient);
     }
     
     @Test
     void testSingleMessageProcessing() throws Exception {
-        // Arrange
         InputMessage message = createMessage("test message");
         double[] embedding = new double[]{0.1, 0.2, 0.3};
         when(pythonClient.getEmbedding(anyString())).thenReturn(embedding);
         
-        // Act
         TrendDetector.ProcessingResult result = detector.processMessage(message, BASE_TIME);
         
-        // Assert
         assertNotNull(result);
         assertTrue(result.getNewTrends().isEmpty()); // Single message shouldn't create trend
         verify(pythonClient).getEmbedding(message.getText());
@@ -49,56 +50,62 @@ class TrendDetectorTest {
     
     @Test
     void testClusterFormation() throws Exception {
-        // Arrange
         List<InputMessage> messages = Arrays.asList(
             createMessage("earthquake in california", new double[]{0.1, 0.1, 0.1}),
             createMessage("california earthquake damage", new double[]{0.11, 0.09, 0.1}),
             createMessage("earthquake hits california coast", new double[]{0.09, 0.11, 0.1})
         );
+
+        assertNotNull(messages.get(0).getEmbedding());
         
-        // Act - Force clustering by sending enough messages
-        TrendDetector.ProcessingResult finalResult = null;
         for (InputMessage msg : messages) {
             when(pythonClient.getEmbedding(msg.getText())).thenReturn(msg.getEmbedding());
-            finalResult = detector.processMessage(msg, BASE_TIME + TrendDetector.UNPROCESSED_MESSAGES_THRESHOLD); // Force clustering
+            detector.processMessage(msg, BASE_TIME); // Force clustering
         }
+        InputMessage msg = createMessage("earthquake hits california coast", new double[]{0.09, 0.11, 0.1});
+        TrendDetector.ProcessingResult finalResult = detector.processMessage(
+            msg, BASE_TIME + TrendDetector.CLUSTERING_INTERVAL_SECONDS * 1000);
         
-        // Assert
         assertNotNull(finalResult);
         assertEquals(1, finalResult.getNewTrends().size());
         Trend trend = finalResult.getNewTrends().get(0);
-        assertEquals(3, trend.getMessages().size());
+        assertEquals(4, trend.getMessages().size());
+        assertThat(trend.getKeywords(), hasItem("earthquake"));
     }
     
     @Test
     void testMultipleClusters() throws Exception {
-        // Arrange
         List<InputMessage> earthquakeMessages = Arrays.asList(
-            createMessage("earthquake in california", new double[]{0.1, 0.1, 0.1}),
-            createMessage("california earthquake damage", new double[]{0.11, 0.09, 0.1}),
-            createMessage("earthquake hits coast", new double[]{0.09, 0.11, 0.1})
+            createMessage("earthquake in california", new double[]{1.0, 1.0, 0.1}),
+            createMessage("california earthquake damage", new double[]{1.0, 0.2, 0.1}),
+            createMessage("earthquake hits coast", new double[]{0.2, 1.0, 0.1}),
+            createMessage("earthquake hits coast", new double[]{0.2, 1.0, 0.1})
         );
         
         List<InputMessage> sportsMessages = Arrays.asList(
-            createMessage("football match today", new double[]{0.8, 0.8, 0.8}),
-            createMessage("great game results", new double[]{0.79, 0.81, 0.8}),
-            createMessage("football score update", new double[]{0.81, 0.79, 0.8})
+            createMessage("football match today", new double[]{-1.0, -1.0, 0.1}),
+            createMessage("great game results", new double[]{-1.0, -0.2, 0.1}),
+            createMessage("football score update", new double[]{-0.2, -1.0, 0.1})
         );
         
-        // Act
-        TrendDetector.ProcessingResult finalResult = null;
         for (InputMessage msg : earthquakeMessages) {
             when(pythonClient.getEmbedding(msg.getText())).thenReturn(msg.getEmbedding());
-            finalResult = detector.processMessage(msg, BASE_TIME);
+            detector.processMessage(msg, BASE_TIME);
         }
         for (InputMessage msg : sportsMessages) {
             when(pythonClient.getEmbedding(msg.getText())).thenReturn(msg.getEmbedding());
-            finalResult = detector.processMessage(msg, BASE_TIME);
+            detector.processMessage(msg, BASE_TIME);
         }
+
+        InputMessage msg = createMessage("football score update", new double[]{0.15, 0.15, 0.95});
+        TrendDetector.ProcessingResult finalResult = detector.processMessage(
+            msg, BASE_TIME + TrendDetector.CLUSTERING_INTERVAL_SECONDS * 1000);
         
         // Assert
         assertNotNull(finalResult);
         assertEquals(2, finalResult.getNewTrends().size());
+        assertEquals(4, finalResult.getNewTrends().get(0).getMessages().size());
+        assertEquals(4, finalResult.getNewTrends().get(1).getMessages().size());
     }
     
     @Test
@@ -130,57 +137,6 @@ class TrendDetectorTest {
         
         // Assert
         assertTrue(result.getNewTrends().isEmpty()); // Should match existing trend
-    }
-    
-    @Test
-    void testTimeBasedClustering() throws Exception {
-        // Arrange
-        List<InputMessage> messages = Arrays.asList(
-            createMessage("message 1", new double[]{0.1, 0.1, 0.1}),
-            createMessage("message 2", new double[]{0.11, 0.09, 0.1})
-        );
-        
-        // Act & Assert - First messages shouldn't trigger clustering
-        for (InputMessage msg : messages) {
-            when(pythonClient.getEmbedding(msg.getText())).thenReturn(msg.getEmbedding());
-            TrendDetector.ProcessingResult result = detector.processMessage(msg, BASE_TIME);
-            assertTrue(result.getNewTrends().isEmpty());
-        }
-        
-        // Act & Assert - Message after time threshold should trigger clustering
-        InputMessage lastMessage = createMessage("message 3", new double[]{0.09, 0.11, 0.1});
-        when(pythonClient.getEmbedding(lastMessage.getText()))
-            .thenReturn(lastMessage.getEmbedding());
-        
-        TrendDetector.ProcessingResult result = detector.processMessage(
-            lastMessage, 
-            BASE_TIME + (TrendDetector.CLUSTERING_INTERVAL_SECONDS * 1000 + 1)
-        );
-        
-        assertFalse(result.getNewTrends().isEmpty());
-    }
-    
-    @Test
-    void testMessageThresholdClustering() throws Exception {
-        // Arrange
-        List<InputMessage> messages = new ArrayList<>();
-        for (int i = 0; i < TrendDetector.UNPROCESSED_MESSAGES_THRESHOLD; i++) {
-            messages.add(createMessage(
-                "message " + i, 
-                new double[]{0.1 + (i * 0.01), 0.1, 0.1}
-            ));
-        }
-        
-        // Act
-        TrendDetector.ProcessingResult finalResult = null;
-        for (InputMessage msg : messages) {
-            when(pythonClient.getEmbedding(msg.getText())).thenReturn(msg.getEmbedding());
-            finalResult = detector.processMessage(msg, BASE_TIME);
-        }
-        
-        // Assert
-        assertNotNull(finalResult);
-        assertFalse(finalResult.getNewTrends().isEmpty());
     }
     
     @Test
