@@ -16,7 +16,7 @@ public class PythonServiceClient {
         this.mapper = new ObjectMapper();
     }
 
-    public double[] getEmbedding(String text) throws IOException {
+    public EmbeddingResponse getEmbedding(String text) throws IOException {
         Map<String, String> request = Map.of("text", text);
         
         try (AFUNIXSocket socket = AFUNIXSocket.newInstance()) {
@@ -38,10 +38,33 @@ public class PythonServiceClient {
                 }
                 
                 List<Double> embeddings = (List<Double>) response.get("embedding");
-                return embeddings.stream()
+                String processedText = (String) response.get("processed_text");
+                
+                double[] embeddingArray = embeddings.stream()
                     .mapToDouble(Double::doubleValue)
                     .toArray();
+                
+                return new EmbeddingResponse(embeddingArray, processedText);
             }
+        }
+    }
+
+    // Response class to hold both embedding and processed text
+    public static class EmbeddingResponse {
+        private final double[] embedding;
+        private final String processedText;
+
+        public EmbeddingResponse(double[] embedding, String processedText) {
+            this.embedding = embedding;
+            this.processedText = processedText;
+        }
+
+        public double[] getEmbedding() {
+            return embedding;
+        }
+
+        public String getProcessedText() {
+            return processedText;
         }
     }
 }

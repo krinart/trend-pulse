@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 import com.trendpulse.items.InputMessage;
 
 public class TfidfKeywordExtractor  {
-    private static final int TOP_KEYWORDS = 5;
+    private static final int TOP_KEYWORDS = 10;
     
     // Helper class to store document term frequencies
     private static class TermFrequencies {
@@ -35,7 +35,7 @@ public class TfidfKeywordExtractor  {
         Set<String> allTerms = new HashSet<>();
         
         for (InputMessage message : messages) {
-            TermFrequencies tf = tokenizeAndCount(message.getText());
+            TermFrequencies tf = tokenizeAndCount(message.getPreProcessedText());
             documentFrequencies.add(tf);
             
             // Update document count for each unique term

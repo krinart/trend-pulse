@@ -90,8 +90,9 @@ public class TrendDetector implements Serializable {
     }
 
     private void prepareMessage(InputMessage message) throws IOException, InterruptedException {
-        double[] messageEmbedding = pythonClient.getEmbedding(message.getText());    
-        message.setEmbedding(messageEmbedding);
+        PythonServiceClient.EmbeddingResponse response = pythonClient.getEmbedding(message.getText());
+        message.setEmbedding(response.getEmbedding());
+        message.setPreProcessedText(response.getProcessedText());
     }
 
     private String matchToTrend(InputMessage message) {
@@ -139,17 +140,13 @@ public class TrendDetector implements Serializable {
                 double norm1 = 0.0;
                 double norm2 = 0.0;
                 
-                    for (int i = 0; i < vec1.length; i++) {
+                for (int i = 0; i < vec1.length; i++) {
                     dotProduct += vec1[i] * vec2[i];
                     norm1 += vec1[i] * vec1[i];
                     norm2 += vec2[i] * vec2[i];
                 }
                 
                 double cosineSimilarity = dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
-                System.out.printf("p1: %s, p2: %s, similarity: %.4f%n", 
-                    Arrays.toString(vec1), 
-                    Arrays.toString(vec2), 
-                    cosineSimilarity);
                 return 1.0 - cosineSimilarity;  // Convert to distance
             }
         );

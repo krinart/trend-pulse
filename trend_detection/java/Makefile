@@ -2,7 +2,7 @@ jbuild:
 	mvn clean package -DskipTests
 
 jrun:
-	java -jar target/trend-detection-1.0-SNAPSHOT.jar -l 100
+	java -jar target/trend-detection-1.0-SNAPSHOT.jar -l -1
 
 dbuild:
 	docker-compose build --no-cache
