@@ -79,18 +79,15 @@ public class TrendDetectionJob {
         }
 
         String inputDataPath = cmd.getOptionValue("p", DEFAULT_DATA_PATH);
+        String socketPath = System.getenv().getOrDefault("SOCKET_PATH", DEFAULT_SOCKET_PATH);
         
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        Configuration config = new Configuration();
-        config.setString("python.socket.path", "/tmp/embedding_server_1.sock");
-
-        // Set as global parameters
-        env.getConfig().setGlobalJobParameters(config);
 
         // Log the configuration
         System.out.println("Running with configuration:");
         System.out.println("  Input path: " + inputDataPath);
         System.out.println("  Message limit: " + limit);
+        System.out.println("  Socket path: " + socketPath);
 
 
         final ObjectMapper mapper = new ObjectMapper();
@@ -147,7 +144,7 @@ public class TrendDetectionJob {
         // Transform and detect trends
         DataStream<TrendEvent> trendEvents = messages
             .keyBy(message -> message.getLocationId())
-            .process(new TrendDetectionProcessor())
+            .process(new TrendDetectionProcessor(socketPath))
             .name("trend-detection");
 
 

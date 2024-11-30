@@ -8,32 +8,22 @@ import java.util.Map;
 import java.util.HashMap;
 
 public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, InputMessage, TrendEvent> {
+    private String socketPath;
     private transient TrendDetector detector;
+
+    public TrendDetectionProcessor(String socketPath) {
+        this.socketPath = socketPath;
+    }
 
     @Override
     public void open(Configuration conf) throws Exception {
-         Map<String, String> params = getRuntimeContext()
-            .getExecutionConfig()
-            .getGlobalJobParameters()
-            .toMap();
-        
-        System.out.println("Available configuration parameters:");
-        params.forEach((key, value) -> System.out.println(key + " -> " + value));
-
-        String socketPath = params.getOrDefault("python.socket.path", "/tmp/embedding_server.sock");
-        System.out.println("Selected socket path: " + socketPath);
-
         detector = new TrendDetector(socketPath);
     }
 
     @Override
     public void processElement(InputMessage message, Context ctx, Collector<TrendEvent> out) 
             throws Exception {
-        // Validate inputs
-        if (message == null) {
-            throw new IllegalArgumentException("Input message cannot be null");
-        }
-        
+    
         // out.collect(new TrendEvent(
         //     "MESSAGE_RECEIVED",
         //     message.getText(),

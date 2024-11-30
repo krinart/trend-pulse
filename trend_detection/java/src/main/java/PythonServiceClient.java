@@ -13,7 +13,6 @@ public class PythonServiceClient {
     private final ObjectMapper mapper;
 
     public PythonServiceClient(String socketFilePath) {
-        System.out.println("socketFilePath: " + socketFilePath);
         this.socketFile = new File(socketFilePath);
         this.mapper = new ObjectMapper();
     }

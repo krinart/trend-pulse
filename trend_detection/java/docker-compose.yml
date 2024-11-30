@@ -25,7 +25,7 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
         taskmanager.memory.process.size: 2048m
-        python.socket.path: /tmp/embedding_server_1.sock
+      - SOCKET_PATH=/tmp/embedding_server_1.sock
     volumes:
       - ./target:/opt/flink/usrlib
       - embedding-sockets-1:/tmp
@@ -52,7 +52,7 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
         taskmanager.memory.process.size: 2048m
-        python.socket.path: /tmp/embedding_server_2.sock
+      - SOCKET_PATH=/tmp/embedding_server_2.sock
     volumes:
       - ./target:/opt/flink/usrlib
       - embedding-sockets-2:/tmp
