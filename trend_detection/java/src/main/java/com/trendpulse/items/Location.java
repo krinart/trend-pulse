@@ -1,3 +1,5 @@
+package com.trendpulse.items;
+
 public class Location {
     private int id;
     private double lat;

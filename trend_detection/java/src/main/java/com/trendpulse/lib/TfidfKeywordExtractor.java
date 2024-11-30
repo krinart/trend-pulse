@@ -1,3 +1,5 @@
+package com.trendpulse.lib;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -5,6 +7,8 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.stream.Collectors;
+
+import com.trendpulse.items.InputMessage;
 
 public class TfidfKeywordExtractor  {
     private static final int TOP_KEYWORDS = 5;

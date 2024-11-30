@@ -1,3 +1,5 @@
+package com.trendpulse.items;
+
 public class TrendEvent {
     private String eventType;  // TREND_CREATED or TREND_STATS
     private String trendId;

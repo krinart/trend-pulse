@@ -1,3 +1,5 @@
+package com.trendpulse;
+
 import java.util.*;
 import java.util.stream.Collectors;
 import java.io.IOException;
@@ -5,6 +7,12 @@ import java.io.Serializable;
 
 import org.apache.commons.math3.ml.clustering.DBSCANClusterer;
 import org.apache.commons.math3.ml.clustering.Cluster;
+
+import com.trendpulse.items.Trend;
+import com.trendpulse.items.InputMessage;
+import com.trendpulse.items.MessagePoint;
+import com.trendpulse.lib.PythonServiceClient;
+import com.trendpulse.lib.TfidfKeywordExtractor;
 
 
 public class TrendDetector implements Serializable {
@@ -16,12 +24,12 @@ public class TrendDetector implements Serializable {
     private transient PythonServiceClient pythonClient;
     private transient TfidfKeywordExtractor keywordExtractor;
 
-    private final double CLUSTERING_EPS = 0.7;
-    private final int MIN_CLUSTER_SIZE = 3;
+    public static final double CLUSTERING_EPS = 0.7;
+    public static final int MIN_CLUSTER_SIZE = 3;
 
-    private static final double SIMILARITY_THRESHOLD = 0.8;
-    private static final int CLUSTERING_INTERVAL_SECONDS = 60;
-    private static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
+    public static final double SIMILARITY_THRESHOLD = 0.8;
+    public static final int CLUSTERING_INTERVAL_SECONDS = 60;
+    public static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
 
     public TrendDetector(String socketFilePath) {
         this.socketFilePath = socketFilePath;
@@ -57,12 +65,15 @@ public class TrendDetector implements Serializable {
             }
         }
 
+
         if (message.getEmbedding() != null) {
             String matchedTrendId = matchToTrend(message);
             if (matchedTrendId != null) {
                 updateTrend(trends.get(matchedTrendId), message, currentTime);
             }
         }
+
+
 
         unmatchedMessages.add(message);
         unProcessedMessages ++;

@@ -1,15 +1,10 @@
+package com.trendpulse;
+
 import org.apache.commons.cli.*;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.util.Collector;
-import org.apache.flink.api.java.tuple.Tuple2;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 
 import org.apache.flink.connector.file.src.FileSource;
@@ -21,8 +16,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.stream.Collectors;
+
+import com.trendpulse.items.InputMessage;
+import com.trendpulse.items.TrendEvent;
+import com.trendpulse.lib.LocationUtils;
+import com.trendpulse.processors.TrendDetectionProcessor;
 
 
 public class TrendDetectionJob {

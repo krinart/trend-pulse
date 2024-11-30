@@ -1,6 +1,9 @@
+package com.trendpulse.lib;
+
 import java.util.List;
 import java.util.Arrays;
 
+import com.trendpulse.items.Location;
 
 public class LocationUtils {
     private static final List<Location> ALL_LOCATIONS = Arrays.asList(

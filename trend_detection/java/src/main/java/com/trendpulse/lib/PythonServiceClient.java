@@ -1,12 +1,11 @@
+package com.trendpulse.lib;
+
 import org.newsclub.net.unix.AFUNIXSocket;
 import org.newsclub.net.unix.AFUNIXSocketAddress;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.*;
-
 import java.io.*;
-import java.nio.file.Path;
-
 
 public class PythonServiceClient {
     private final File socketFile;

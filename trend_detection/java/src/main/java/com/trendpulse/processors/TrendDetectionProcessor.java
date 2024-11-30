@@ -1,11 +1,16 @@
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
+package com.trendpulse.processors;
+
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
 import java.util.Map;
 import java.util.HashMap;
+
+import com.trendpulse.TrendDetector;
+import com.trendpulse.items.InputMessage;
+import com.trendpulse.items.TrendEvent;
+import com.trendpulse.items.Trend;
 
 public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, InputMessage, TrendEvent> {
     private String socketPath;

@@ -1,3 +1,5 @@
+package com.trendpulse.items;
+
 import org.apache.commons.math3.ml.clustering.Clusterable;
 
 

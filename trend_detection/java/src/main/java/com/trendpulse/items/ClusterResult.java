@@ -1,3 +1,5 @@
+package com.trendpulse.items;
+
 public class ClusterResult {
     private float[] centroid;
 
