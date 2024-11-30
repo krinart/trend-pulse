@@ -72,6 +72,7 @@ public class TrendDetector {
 
         if (timeThresholdMet || countThresholdMet) {
             this.cleanupOldMessages(currentTime);
+            this.cleanupOldTrends(currentTime);
             
             List<Trend> newTrends = detectNewTrends(currentTime);
             result.setNewTrends(newTrends);
@@ -86,7 +87,7 @@ public class TrendDetector {
     private void cleanupOldMessages(long currentTime) {
         if (currentTime < 0 || unmatchedMessages.size() == 0) return;
 
-        // System.out.println("cleanupOldMessages diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
+        System.out.println("cleanupOldMessages diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
 
         long cutoffTime = currentTime - (MIN_KEEP_UNMATCHED_MESSAGES * 60 * 1000);
         // Only cleanup unmatched messages - clustered ones stay until trend retirement
@@ -94,7 +95,32 @@ public class TrendDetector {
         long initSize = unmatchedMessages.size();
         unmatchedMessages.removeIf(message -> message.getTimestamp() < cutoffTime);
         long endSize = unmatchedMessages.size();
-        // System.out.println("cleanupOldMessages(" + currentTime + "): " + (initSize -endSize));
+        System.out.println("cleanupOldMessages(" + currentTime + "): " + (initSize -endSize));
+    }
+
+    private void cleanupOldTrends(long currentTime) {
+        if (currentTime < 0 || trends.size() == 0) return;
+
+        long cutoffTime = currentTime - (MIN_KEEP_UNMATCHED_MESSAGES * 60 * 1000);
+
+        List<String> deletedTrendIds = new ArrayList<String>();
+
+        for (Map.Entry<String, Trend> entry : trends.entrySet()) {
+
+            String trendID = entry.getKey();
+            Trend trend = entry.getValue();
+
+            if (trend.getLastUpdate() < cutoffTime) {
+                System.out.println("Remove trend with " + trend.getMessages().size() + " messages");
+                clusteredMessages.removeAll(trend.getMessages());
+                unmatchedMessages.removeAll(trend.getMessages());
+                deletedTrendIds.add(trendID);
+            }
+        }
+
+        for (String trendID: deletedTrendIds) {
+            trends.remove(trendID);
+        }
     }
 
     private Message initializeMessage(InputMessage im) {
@@ -134,9 +160,9 @@ public class TrendDetector {
     }
 
     private void updateTrend(Trend trend, Message message, long timestamp) {
-        // trend.getMessages().add(message);
+        trend.addMessage(message);
         trend.setLastUpdate(timestamp);
-        // // trend.incrementMatchedCount();
+        // trend.incrementMatchedCount();
 
         // float[] messageEmbedding = pythonClient.getEmbedding(message.getText());
         // updateCentroid(trend, messageEmbedding);
@@ -153,7 +179,7 @@ public class TrendDetector {
         List<Trend> newTrends = new ArrayList<>();
         
         if (unmatchedMessages.size() > 0) {
-            // System.out.println("detectNewTrends diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
+            System.out.println("detectNewTrends diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
         }
 
         List<MessagePoint> points = new ArrayList<>();
@@ -164,7 +190,7 @@ public class TrendDetector {
             points.add(new MessagePoint(message));
         }
 
-        // System.out.println("detectNewTrends - clustered: " + clusteredMessages.size() + " unmatched: " + unmatchedMessages.size());
+        System.out.println("detectNewTrends - clustered: " + clusteredMessages.size() + " unmatched: " + unmatchedMessages.size());
 
         DBSCANClusterer<MessagePoint> dbscan = new DBSCANClusterer<>(
             CLUSTERING_EPS, 
@@ -209,6 +235,7 @@ public class TrendDetector {
                 double similarity = cosineSimilarity(centroid, existingTrend.getCentroid());
                 if (similarity > SIMILARITY_THRESHOLD) {
                     matchedExisting = true;
+                    existingTrend.updateMessages(clusterMessages);
                     break;
                 }
             }
@@ -223,13 +250,9 @@ public class TrendDetector {
                     currentTime
                 );
 
-                for (MessagePoint point : cluster.getPoints()) {
-                    Message message = point.getMessage();
-                    message.setClusterTrendId(trendId);
-                    clusteredMessages.add(message);
-                    unmatchedMessages.remove(message);
-                }
-                
+                clusteredMessages.addAll(clusterMessages);
+                unmatchedMessages.removeAll(clusterMessages);
+
                 trends.put(trendId, newTrend);
                 newTrends.add(newTrend);
 
