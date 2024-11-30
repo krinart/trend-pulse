@@ -2,9 +2,12 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
+ENV NLTK_DATA=/opt/venv/nltk_data
+
 # Install required packages
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+	python -c "import nltk; nltk.download('punkt', download_dir='/opt/venv/nltk_data'); nltk.download('stopwords', download_dir='/opt/venv/nltk_data'); nltk.download('punkt_tab', download_dir='/opt/venv/nltk_data'); nltk.download('wordnet', download_dir='/opt/venv/nltk_data')"
 
 # Copy Python server code
 COPY server.py .

@@ -81,6 +81,11 @@ public class TrendDetectionJob {
         String inputDataPath = cmd.getOptionValue("p", DEFAULT_DATA_PATH);
         
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        Configuration config = new Configuration();
+        config.setString("python.socket.path", "/tmp/embedding_server_1.sock");
+
+        // Set as global parameters
+        env.getConfig().setGlobalJobParameters(config);
 
         // Log the configuration
         System.out.println("Running with configuration:");

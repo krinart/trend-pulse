@@ -12,7 +12,7 @@ public class TrendDetector implements Serializable {
     private List<InputMessage> unmatchedMessages;
     private long lastClusteringTime;
     private int unProcessedMessages;
-    private String sockerFilePath;
+    private String socketFilePath;
     private transient PythonServiceClient pythonClient;
     private transient TfidfKeywordExtractor keywordExtractor;
 
@@ -23,8 +23,8 @@ public class TrendDetector implements Serializable {
     private static final int CLUSTERING_INTERVAL_SECONDS = 60;
     private static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
 
-    public TrendDetector(String sockerFilePath) {
-        this.sockerFilePath = sockerFilePath;
+    public TrendDetector(String socketFilePath) {
+        this.socketFilePath = socketFilePath;
         this.trends = new HashMap<>();
         this.unmatchedMessages = new ArrayList<>();
         this.lastClusteringTime = System.currentTimeMillis();
@@ -33,7 +33,7 @@ public class TrendDetector implements Serializable {
     }
 
     private void initTransients() {
-        this.pythonClient = new PythonServiceClient(this.sockerFilePath);
+        this.pythonClient = new PythonServiceClient(this.socketFilePath);
         this.keywordExtractor = new TfidfKeywordExtractor();
     }
 
@@ -47,9 +47,14 @@ public class TrendDetector implements Serializable {
         ProcessingResult result = new ProcessingResult();
         
         try {
-            this.prepareMessage(message);    
+            this.prepareMessage(message);
         } catch (IOException | InterruptedException e) {
-
+            System.out.println("Failed to prepare message: " + e.toString());
+            e.printStackTrace(System.err);
+            if (e.getCause() != null) {
+                System.err.println("Caused by: ");
+                e.getCause().printStackTrace(System.err);
+            }
         }
 
         if (message.getEmbedding() != null) {
@@ -76,7 +81,7 @@ public class TrendDetector implements Serializable {
     }
 
     private void prepareMessage(InputMessage message) throws IOException, InterruptedException {
-        double[] messageEmbedding = pythonClient.getEmbedding(message.getText());
+        double[] messageEmbedding = pythonClient.getEmbedding(message.getText());    
         message.setEmbedding(messageEmbedding);
     }
 

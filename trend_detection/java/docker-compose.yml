@@ -9,6 +9,9 @@ services:
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         parallelism.default: 2
+    volumes:
+      - ./target:/opt/flink/usrlib
+      - ./data:/opt/flink/data
 
   taskmanager-1:
     image: flink:1.18.0-java11
@@ -22,10 +25,11 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
         taskmanager.memory.process.size: 2048m
-        python.socket.path=/tmp/embedding_server_1.sock
+        python.socket.path: /tmp/embedding_server_1.sock
     volumes:
       - ./target:/opt/flink/usrlib
       - embedding-sockets-1:/tmp
+      - ./data:/opt/flink/data
 
   embedding-server-1:
     build:
@@ -48,10 +52,11 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
         taskmanager.memory.process.size: 2048m
-        python.socket.path=/tmp/embedding_server_2.sock
+        python.socket.path: /tmp/embedding_server_2.sock
     volumes:
       - ./target:/opt/flink/usrlib
       - embedding-sockets-2:/tmp
+      - ./data:/opt/flink/data
 
   embedding-server-2:
     image: java-embedding-server-1:latest

@@ -12,13 +12,16 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
 
     @Override
     public void open(Configuration conf) throws Exception {
-         // Get socket path from configuration
-        String socketPath = getRuntimeContext()
+         Map<String, String> params = getRuntimeContext()
             .getExecutionConfig()
             .getGlobalJobParameters()
-            .toMap()
-            .getOrDefault("python.socket.path", "/tmp/embedding_server.sock")
-            .toString();
+            .toMap();
+        
+        System.out.println("Available configuration parameters:");
+        params.forEach((key, value) -> System.out.println(key + " -> " + value));
+
+        String socketPath = params.getOrDefault("python.socket.path", "/tmp/embedding_server.sock");
+        System.out.println("Selected socket path: " + socketPath);
 
         detector = new TrendDetector(socketPath);
     }
