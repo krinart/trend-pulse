@@ -74,6 +74,8 @@ def process_request(connection):
         processed_text = preprocess_text(text)
         embedding = model.encode([processed_text])[0]
 
+        print(f"original: {text[:50]}, processed: {processed_text[:50]}")
+
         # Prepare and send response
         response = {
             'original_text': text,

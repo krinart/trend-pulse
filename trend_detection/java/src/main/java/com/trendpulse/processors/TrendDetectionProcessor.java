@@ -29,45 +29,25 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
     public void processElement(InputMessage message, Context ctx, Collector<TrendEvent> out) 
             throws Exception {
     
-        // out.collect(new TrendEvent(
-        //     "MESSAGE_RECEIVED",
-        //     message.getText(),
-        //     ctx.getCurrentKey(), // or some other default key
-        //     "" + ctx.timerService().currentWatermark()
-        // ));
-
-        // Use current processing time
-        long timestamp = ctx.timerService().currentProcessingTime();
+        long timestamp = ctx.timerService().currentWatermark();
             
+        TrendDetector.ProcessingResult result = detector.processMessage(message, timestamp);
         
-            // Process message and get results
-            TrendDetector.ProcessingResult result = detector.processMessage(message, timestamp);
-            
-            // out.collect(new TrendEvent(
-            //     "MESSAGE_PROCESSED",
-            //     "trend-id",
-            //     ctx.getCurrentKey(), // or some other default key
-            //     "event-info"
-            // ));
-
-            // Emit events for new trends if any were detected
-            if (result != null && result.getNewTrends() != null) {
-                for (Trend trend : result.getNewTrends()) {
-                    Map<String, Object> eventInfo = new HashMap<>();
-                    eventInfo.put("keywords", trend.getKeywords());
-                    
-                    TrendEvent event = new TrendEvent(
-                        "TREND_CREATED",
-                        trend.getKeywords().toString(),
-                        ctx.getCurrentKey(), // or some other default key
-                        "" + ctx.timerService().currentWatermark()
-                    );
-                    
-                    out.collect(event);
-                }
+        if (result != null && result.getNewTrends() != null) {
+            for (Trend trend : result.getNewTrends()) {
+                Map<String, Object> eventInfo = new HashMap<>();
+                eventInfo.put("keywords", trend.getKeywords());
+                
+                TrendEvent event = new TrendEvent(
+                    "TREND_CREATED",
+                    trend.getKeywords().toString(),
+                    ctx.getCurrentKey(), // or some other default key
+                    "" + ctx.timerService().currentWatermark()
+                );
+                
+                out.collect(event);
             }
-            
-        
+        }
     }
     
     @Override

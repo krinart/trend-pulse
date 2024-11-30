@@ -3,26 +3,27 @@ package com.trendpulse;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.io.IOException;
-import java.io.Serializable;
 
 import org.apache.commons.math3.ml.clustering.DBSCANClusterer;
 import org.apache.commons.math3.ml.clustering.Cluster;
 
 import com.trendpulse.items.Trend;
 import com.trendpulse.items.InputMessage;
+import com.trendpulse.items.Message;
 import com.trendpulse.items.MessagePoint;
 import com.trendpulse.lib.PythonServiceClient;
 import com.trendpulse.lib.TfidfKeywordExtractor;
 
 
-public class TrendDetector implements Serializable {
+public class TrendDetector {
     private Map<String, Trend> trends;
-    private List<InputMessage> unmatchedMessages;
+    private Set<Message> clusteredMessages;
+    private List<Message> unmatchedMessages;
     private long lastClusteringTime;
     private int unProcessedMessages;
     private String socketFilePath;
-    private transient PythonServiceClient pythonClient;
-    private transient TfidfKeywordExtractor keywordExtractor;
+    private  PythonServiceClient pythonClient;
+    private TfidfKeywordExtractor keywordExtractor;
 
     public static final double CLUSTERING_EPS = 0.7;
     public static final int MIN_CLUSTER_SIZE = 3;
@@ -30,58 +31,51 @@ public class TrendDetector implements Serializable {
     public static final double SIMILARITY_THRESHOLD = 0.8;
     public static final int CLUSTERING_INTERVAL_SECONDS = 60;
     public static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
+    public static final int MIN_KEEP_UNMATCHED_MESSAGES = 60;
 
     public TrendDetector(String socketFilePath) {
         this.socketFilePath = socketFilePath;
         this.trends = new HashMap<>();
+        this.clusteredMessages = new HashSet<>();
         this.unmatchedMessages = new ArrayList<>();
         this.lastClusteringTime = 0;
         this.unProcessedMessages = 0;
-        initTransients();
-    }
-
-    private void initTransients() {
         this.pythonClient = new PythonServiceClient(this.socketFilePath);
         this.keywordExtractor = new TfidfKeywordExtractor();
     }
 
-    private void readObject(java.io.ObjectInputStream in) 
-            throws IOException, ClassNotFoundException {
-        in.defaultReadObject();
-        initTransients();
-    }
-
-    public ProcessingResult processMessage(InputMessage message, long currentTime) {
+    public ProcessingResult processMessage(InputMessage inputMessage, long currentTime) {
         ProcessingResult result = new ProcessingResult();
         
-        try {
-            this.prepareMessage(message);
-        } catch (IOException | InterruptedException e) {
-            System.out.println("Failed to prepare message: " + e.toString());
-            e.printStackTrace(System.err);
-            if (e.getCause() != null) {
-                System.err.println("Caused by: ");
-                e.getCause().printStackTrace(System.err);
-            }
-        }
+        Message message = this.initializeMessage(inputMessage);
 
-
+        boolean matchedExistingTrend = false;
         if (message.getEmbedding() != null) {
             String matchedTrendId = matchToTrend(message);
             if (matchedTrendId != null) {
+                matchedExistingTrend = true;
                 updateTrend(trends.get(matchedTrendId), message, currentTime);
             }
         }
 
-        unmatchedMessages.add(message);
-        unProcessedMessages ++;
+        if (!matchedExistingTrend) {
+            unmatchedMessages.add(message);
+            unProcessedMessages ++;
+        }
         
+        if (currentTime < 0) {
+            return result;
+        }
+
         boolean timeThresholdMet = (currentTime - lastClusteringTime) >= CLUSTERING_INTERVAL_SECONDS * 1000;
         boolean countThresholdMet = unProcessedMessages >= UNPROCESSED_MESSAGES_THRESHOLD;
 
         if (timeThresholdMet || countThresholdMet) {
+            this.cleanupOldMessages(currentTime);
+            
             List<Trend> newTrends = detectNewTrends(currentTime);
             result.setNewTrends(newTrends);
+            
             lastClusteringTime = currentTime;
             unProcessedMessages = 0;
         }
@@ -89,13 +83,47 @@ public class TrendDetector implements Serializable {
         return result;
     }
 
-    private void prepareMessage(InputMessage message) throws IOException, InterruptedException {
-        PythonServiceClient.EmbeddingResponse response = pythonClient.getEmbedding(message.getText());
-        message.setEmbedding(response.getEmbedding());
-        message.setPreProcessedText(response.getProcessedText());
+    private void cleanupOldMessages(long currentTime) {
+        if (currentTime < 0 || unmatchedMessages.size() == 0) return;
+
+        // System.out.println("cleanupOldMessages diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
+
+        long cutoffTime = currentTime - (MIN_KEEP_UNMATCHED_MESSAGES * 60 * 1000);
+        // Only cleanup unmatched messages - clustered ones stay until trend retirement
+
+        long initSize = unmatchedMessages.size();
+        unmatchedMessages.removeIf(message -> message.getTimestamp() < cutoffTime);
+        long endSize = unmatchedMessages.size();
+        // System.out.println("cleanupOldMessages(" + currentTime + "): " + (initSize -endSize));
     }
 
-    private String matchToTrend(InputMessage message) {
+    private Message initializeMessage(InputMessage im) {
+        Message message = new Message();
+        message.setText(im.getText());
+        message.setTopic(im.getTopic());
+        message.setDatetime(im.getDatetime());
+        message.setLat(im.getLat());
+        message.setLon(im.getLon());
+        message.setDLocationId(im.getDLocationId());
+        message.setDTrendId(im.getDTrendId());
+        
+        try {
+            PythonServiceClient.EmbeddingResponse response = pythonClient.getEmbedding(im.getText());
+            message.setEmbedding(response.getEmbedding());
+            message.setPreProcessedText(response.getProcessedText());
+        } catch (IOException e) {
+            System.out.println("Failed to prepare message: " + e.toString());
+            e.printStackTrace(System.err);
+            if (e.getCause() != null) {
+                System.err.println("Caused by: ");
+                e.getCause().printStackTrace(System.err);
+            }
+        }
+        
+        return message;
+    }
+
+    private String matchToTrend(Message message) {
         for (Map.Entry<String, Trend> entry : trends.entrySet()) {
             double similarity = cosineSimilarity(message.getEmbedding(), entry.getValue().getCentroid());
             if (similarity > SIMILARITY_THRESHOLD) {
@@ -105,9 +133,9 @@ public class TrendDetector implements Serializable {
         return null;
     }
 
-    private void updateTrend(Trend trend, InputMessage message, long timestamp) {
+    private void updateTrend(Trend trend, Message message, long timestamp) {
         // trend.getMessages().add(message);
-        // trend.setLastUpdate(timestamp);
+        trend.setLastUpdate(timestamp);
         // // trend.incrementMatchedCount();
 
         // float[] messageEmbedding = pythonClient.getEmbedding(message.getText());
@@ -121,12 +149,22 @@ public class TrendDetector implements Serializable {
     }
 
     private List<Trend> detectNewTrends(long currentTime) {
+        long startTime = System.currentTimeMillis();
         List<Trend> newTrends = new ArrayList<>();
         
+        if (unmatchedMessages.size() > 0) {
+            // System.out.println("detectNewTrends diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
+        }
+
         List<MessagePoint> points = new ArrayList<>();
-        for (InputMessage message : unmatchedMessages) {
+        for (Message message : unmatchedMessages) {
             points.add(new MessagePoint(message));
         }
+        for (Message message : clusteredMessages) {
+            points.add(new MessagePoint(message));
+        }
+
+        // System.out.println("detectNewTrends - clustered: " + clusteredMessages.size() + " unmatched: " + unmatchedMessages.size());
 
         DBSCANClusterer<MessagePoint> dbscan = new DBSCANClusterer<>(
             CLUSTERING_EPS, 
@@ -155,7 +193,7 @@ public class TrendDetector implements Serializable {
         
         // Convert clusters to trends
         for (Cluster<MessagePoint> cluster : clusters) {
-            List<InputMessage> clusterMessages = cluster.getPoints().stream()
+            List<Message> clusterMessages = cluster.getPoints().stream()
                 .map(MessagePoint::getMessage)
                 .collect(Collectors.toList());
                 
@@ -184,6 +222,13 @@ public class TrendDetector implements Serializable {
                     centroid, 
                     currentTime
                 );
+
+                for (MessagePoint point : cluster.getPoints()) {
+                    Message message = point.getMessage();
+                    message.setClusterTrendId(trendId);
+                    clusteredMessages.add(message);
+                    unmatchedMessages.remove(message);
+                }
                 
                 trends.put(trendId, newTrend);
                 newTrends.add(newTrend);
@@ -191,6 +236,9 @@ public class TrendDetector implements Serializable {
             }
         }
         
+        long endTime = System.currentTimeMillis();
+        // System.out.println("detectNewTrends(" + currentTime + "): " + (endTime - startTime) + "ms");
+
         return newTrends;
     }
 
@@ -208,11 +256,6 @@ public class TrendDetector implements Serializable {
         for (int i = 0; i < dimensions; i++) {
             centroid[i] /= points.size();
         }
-        
-        // double[] result = new double[dimensions];
-        // for (int i = 0; i < dimensions; i++) {
-        //     result[i] = (float) centroid[i];
-        // }
         
         return centroid;
     }

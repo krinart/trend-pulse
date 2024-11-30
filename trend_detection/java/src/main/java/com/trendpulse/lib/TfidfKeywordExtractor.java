@@ -8,10 +8,10 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.stream.Collectors;
 
-import com.trendpulse.items.InputMessage;
+import com.trendpulse.items.Message;
 
 public class TfidfKeywordExtractor  {
-    private static final int TOP_KEYWORDS = 10;
+    private static final int TOP_KEYWORDS = 5;
     
     // Helper class to store document term frequencies
     private static class TermFrequencies {
@@ -28,13 +28,13 @@ public class TfidfKeywordExtractor  {
         }
     }
     
-    public List<String> extractKeywords(List<InputMessage> messages) {
+    public List<String> extractKeywords(List<Message> messages) {
         // Step 1: Tokenize all messages and build document frequencies
         List<TermFrequencies> documentFrequencies = new ArrayList<>();
         Map<String, Integer> documentCount = new HashMap<>();
         Set<String> allTerms = new HashSet<>();
         
-        for (InputMessage message : messages) {
+        for (Message message : messages) {
             TermFrequencies tf = tokenizeAndCount(message.getPreProcessedText());
             documentFrequencies.add(tf);
             

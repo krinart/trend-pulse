@@ -10,10 +10,8 @@ public class InputMessage {
     private double lon;
     private double lat;
     private String text;
-    private String preProcessedText;
     private int locationID;
 
-    private double[] embedding;
     private OffsetDateTime datetime;
 
     @JsonProperty("d_trend_id")
@@ -44,12 +42,6 @@ public class InputMessage {
     
     public String getText() { return text; }
     public void setText(String text) { this.text = text; }
-
-    public double[] getEmbedding() { return embedding; }
-    public void setEmbedding(double[] embedding) { this.embedding = embedding; }
-
-    public String getPreProcessedText() { return preProcessedText; }
-    public void setPreProcessedText(String preProcessedText) { this.preProcessedText = preProcessedText; }
 
     public OffsetDateTime getDatetime() { return datetime; }
     public void setDatetime(OffsetDateTime datetime) { this.datetime = datetime; }

@@ -9,12 +9,12 @@ public class Trend implements Serializable {
     private List<String> keywords;
     private long createdAt;
     private long lastUpdate;
-    private List<InputMessage> messages;
+    private List<Message> messages;
     private double[] centroid;
     private int originalMessagesCount;
     private int matchedMessagesCount;
 
-    public Trend(String id, List<String> keywords, List<InputMessage> messages, 
+    public Trend(String id, List<String> keywords, List<Message> messages, 
                 double[] centroid, long currentTime) {
         this.id = id;
         this.keywords = keywords;
@@ -31,7 +31,7 @@ public class Trend implements Serializable {
     public List<String> getKeywords() { return keywords; }
     public double[] getCentroid() { return centroid; }
     public long getLastUpdate() { return lastUpdate; }
-    public List<InputMessage> getMessages() { return messages; }
+    public List<Message> getMessages() { return messages; }
 
     // Setters
     public void setLastUpdate(long lastUpdate) { this.lastUpdate = lastUpdate; }

@@ -1,5 +1,5 @@
 jbuild:
-	mvn clean package -DskipTests
+	mvn clean package -Dmaven.test.skip=true
 
 jrun:
 	java -jar target/trend-detection-1.0-SNAPSHOT.jar -l -1
