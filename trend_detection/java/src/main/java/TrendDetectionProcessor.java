@@ -23,12 +23,12 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
             throw new IllegalArgumentException("Input message cannot be null");
         }
         
-        out.collect(new TrendEvent(
-            "MESSAGE_RECEIVED",
-            message.getText(),
-            ctx.getCurrentKey(), // or some other default key
-            "" + ctx.timerService().currentWatermark()
-        ));
+        // out.collect(new TrendEvent(
+        //     "MESSAGE_RECEIVED",
+        //     message.getText(),
+        //     ctx.getCurrentKey(), // or some other default key
+        //     "" + ctx.timerService().currentWatermark()
+        // ));
 
         // Use current processing time
         long timestamp = ctx.timerService().currentProcessingTime();
@@ -52,9 +52,9 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                     
                     TrendEvent event = new TrendEvent(
                         "TREND_CREATED",
-                        trend.getId(),
+                        trend.getKeywords().toString(),
                         ctx.getCurrentKey(), // or some other default key
-                        trend.getKeywords().toString()
+                        "" + ctx.timerService().currentWatermark()
                     );
                     
                     out.collect(event);

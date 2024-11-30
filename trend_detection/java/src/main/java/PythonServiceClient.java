@@ -1,59 +1,48 @@
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.util.List;
-import java.util.Map;
-
-import com.fasterxml.jackson.core.type.TypeReference;
+import org.newsclub.net.unix.AFUNIXSocket;
+import org.newsclub.net.unix.AFUNIXSocketAddress;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.*;
+
+import java.io.*;
+import java.nio.file.Path;
 
 
 public class PythonServiceClient {
-    private final String baseUrl;
-    private transient HttpClient client;
-    private transient ObjectMapper mapper;
+    private final File socketFile;
+    private final ObjectMapper mapper;
 
-    public PythonServiceClient(String host, String port) {
-        this.baseUrl = String.format("http://%s:%s", host, port);
+    public PythonServiceClient(String socketPath) {
+        this.socketFile = new File(socketPath);
+        this.mapper = new ObjectMapper();
     }
 
-    private void ensureInitialized() {
-        if (client == null) {
-            client = HttpClient.newHttpClient();
-        }
-        if (mapper == null) {
-            mapper = new ObjectMapper();
-        }
-    }
-
-    public double[] getEmbedding(String text) throws IOException, InterruptedException {
-        ensureInitialized();
-
-        return new double[]{1.0, 2.0, 3.0};
-
-
-        // HttpRequest request = HttpRequest.newBuilder()
-        //     .uri(URI.create(baseUrl + "/embedding"))
-        //     .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(
-        //         Map.of("text", text)
-        //     )))
-        //     .header("Content-Type", "application/json")
-        //     .build();
-
-        // HttpResponse<String> response = client.send(request, 
-        //     HttpResponse.BodyHandlers.ofString());
-
-        // Map<String, Object> result = mapper.readValue(response.body(), 
-        //     new TypeReference<Map<String, Object>>() {});
-            
-        // List<Number> embeddings = (List<Number>) result.get("embedding");
-        // double[] embeddingArray = new double[embeddings.size()];
-        // for (int i = 0; i < embeddings.size(); i++) {
-        //     embeddingArray[i] = embeddings.get(i).floatValue();
-        // }
+    public double[] getEmbedding(String text) throws IOException {
+        Map<String, String> request = Map.of("text", text);
         
-        // return embeddingArray;
+        try (AFUNIXSocket socket = AFUNIXSocket.newInstance()) {
+            socket.connect(AFUNIXSocketAddress.of(socketFile));
+            
+            // Send request
+            try (OutputStream out = socket.getOutputStream()) {
+                mapper.writeValue(out, request);
+                out.flush();
+                socket.shutdownOutput(); // Important: signals end of request
+            }
+            
+            // Read response
+            try (InputStream in = socket.getInputStream()) {
+                Map<String, Object> response = mapper.readValue(in, Map.class);
+                
+                if (response.containsKey("error")) {
+                    throw new IOException("Server error: " + response.get("error"));
+                }
+                
+                List<Double> embeddings = (List<Double>) response.get("embedding");
+                return embeddings.stream()
+                    .mapToDouble(Double::doubleValue)
+                    .toArray();
+            }
+        }
     }
 }

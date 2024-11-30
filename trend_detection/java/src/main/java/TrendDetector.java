@@ -1,7 +1,4 @@
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.io.IOException;
 import java.io.Serializable;
@@ -34,7 +31,7 @@ public class TrendDetector implements Serializable {
     }
 
     private void initTransients() {
-        this.pythonClient = new PythonServiceClient("localhost", "9999");
+        this.pythonClient = new PythonServiceClient("/tmp/embedding_server.sock");
         this.keywordExtractor = new TfidfKeywordExtractor();
     }
 

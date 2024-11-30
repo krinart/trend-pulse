@@ -1,5 +1,5 @@
 import nltk
-# from nltk.corpus import stopwords
+from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 from nltk.stem.porter import PorterStemmer
@@ -12,38 +12,40 @@ import re
 # nltk.download('wordnet')
 
 stop_words = {"haven't", 'a', 'weren', 'before', 'of', 'itself', 'on', 'his', 'hers', 'couldn', 'ma', 'being', 'shan', 'with', 'those', 'll', 'theirs', 'had', 'any', "you're", 'by', 'was', 'in', 'aren', 'haven', 'an', 'ourselves', 'shouldn', 'what', 'such', 'through', 'm', 'is', 'don', 'he', 'needn', 'then', 'themselves', 'own', 'be', 'while', 'didn', 'are', 'why', 'their', "wouldn't", "couldn't", 'ain', 'not', 'here', 'these', 'up', 'few', 'wouldn', 'the', 'from', 'this', 'hasn', "didn't", 'against', "you'd", 't', "aren't", 'at', 'you', "shan't", 'isn', "shouldn't", 'after', 'over', 'when', 'just', 'were', 'there', 'd', 'we', 'hadn', 'y', 'how', 'has', 'yours', 'under', 'most', 'did', 'because', 'am', 'having', "you've", 'won', 'until', 'have', 'for', 'him', "don't", 'mustn', 'that', 'them', 'herself', "mightn't", 'yourself', 'it', "hadn't", 'all', 'to', 'i', 'been', 'into', 'your', 'as', 'more', 'so', 'myself', "wasn't", 'she', 'himself', 'other', 'doing', "hasn't", 'mightn', "won't", "she's", 'doesn', 'or', 'off', 'below', 'will', 'nor', 'o', 'during', 're', "needn't", 'out', 'yourselves', 'me', 'very', 'but', "mustn't", 'ours', 'whom', 'once', 'and', 'each', 'who', 'than', 'same', 'wasn', 'now', "that'll", 'do', 'further', 'should', "you'll", 'between', 'where', "doesn't", 'some', 'which', 'they', 'can', 'about', 'her', 'our', 'only', 'too', "isn't", 'again', 've', 'its', "it's", 'my', 's', 'does', 'if', 'above', "should've", 'no', 'both', "weren't", 'down'}
-
+whitelist = {'ai', 'ml', 'ui', 'ux', 'os', 'tv', 'uk', 'us', 'eu'}
+    
 
 def preprocess_text(text):
-    """
-    Normalize text by:
-    1. Converting to lowercase
-    2. Removing special characters/punctuation
-    3. Tokenizing
-    4. Removing stopwords
-    5. Removing short words
-    """
     # Convert to lowercase
-    # nltk.download('stopwords')
     text = text.lower()
     
-    # Remove special characters and extra whitespace
+    # Save whitelisted terms by replacing them with placeholders
+    preserved_terms = {}
+    for i, term in enumerate(whitelist):
+        placeholder = f"PRESERVED_{i}"
+        if term in text.lower():
+            preserved_terms[placeholder] = term
+            text = re.sub(rf'\b{term}\b', placeholder, text, flags=re.IGNORECASE)
+    
+    # Regular preprocessing
     text = re.sub(r'[^\w\s]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
     
-    # Tokenize
     tokens = word_tokenize(text)
     
-    # Remove stopwords and short words
-    # stop_words = set(stopwords.words('english'))
     tokens = [
         token for token in tokens 
-        if token not in stop_words  # Remove stopwords
-        and len(token) > 2  # Remove very short words
+        if (token not in stop_words and len(token) > 2) or 
+           token in whitelist or 
+           token in preserved_terms.keys()
     ]
     
-    # Join tokens back into text
-    return ' '.join(tokens)
+    # Restore preserved terms
+    processed_text = ' '.join(tokens)
+    for placeholder, term in preserved_terms.items():
+        processed_text = processed_text.replace(placeholder, term)
+    
+    return processed_text
 
 
 def advanced_preprocess_text(text):

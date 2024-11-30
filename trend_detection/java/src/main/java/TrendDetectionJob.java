@@ -108,7 +108,9 @@ public class TrendDetectionJob {
 
 
         trendEvents
-            .map(event -> String.format("%s: %s", event.getEventType(), event.getEventInfo()))
+            .map(event -> String.format(
+                "%s(%s, %s): %s", 
+                event.getEventType(), event.getLocationId(), event.getEventInfo(), event.getTrendId()))
             .print();
 
         // Execute
