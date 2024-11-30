@@ -12,8 +12,8 @@ public class PythonServiceClient {
     private final File socketFile;
     private final ObjectMapper mapper;
 
-    public PythonServiceClient(String socketPath) {
-        this.socketFile = new File(socketPath);
+    public PythonServiceClient(String socketFilePath) {
+        this.socketFile = new File(socketFilePath);
         this.mapper = new ObjectMapper();
     }
 

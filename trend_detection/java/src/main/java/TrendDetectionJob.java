@@ -1,6 +1,4 @@
-// File: TrendDetectionJob.java
-// package com.example.trendpulse;
-
+import org.apache.commons.cli.*;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
@@ -29,48 +27,88 @@ import java.util.stream.Collectors;
 
 public class TrendDetectionJob {
     
-    static String PATH = "/Users/viktor/workspace/ds2/trend_detection/data/messages_rows.json";
+    // /opt/flink/data/messages_rows.json
+    static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows.json";
+    static String DEFAULT_SOCKET_PATH = "/tmp/embedding_server.sock";
+    static int DEFAULT_LIMIT = 10;
 
     public static void main(String[] args) throws Exception {
-
-        TfidfKeywordExtractor keywordExtractor = new TfidfKeywordExtractor();
-
-
-        int limit = 10;
-        if (args.length > 0) {
-            try {
-                limit = Integer.parseInt(args[0]);
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid limit argument, using default: " + limit);
-            }
-        } else {
-            System.out.println("No limit specified, using default: " + limit);
-        }
-
-        List<String> lines = Files.readAllLines(Paths.get(PATH));
+        Options options = new Options();
         
-        // Optionally limit size
-        if (lines.size() > limit) {
-            lines = lines.subList(0, limit);
-        }
-
-        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        
-        final FileSource<String> source = FileSource
-            .forRecordStreamFormat(new TextLineInputFormat(), new Path(PATH))
+        Option limitOption = Option.builder("l")
+            .longOpt("limit")
+            .hasArg()
+            .argName("LIMIT")
+            .desc("Limit the number of messages to process")
+            .type(Number.class)
+            .build();
+            
+        Option pathOption = Option.builder("p")
+            .longOpt("path")
+            .hasArg()
+            .argName("PATH")
+            .desc("Path to the input JSON file")
             .build();
 
+        options.addOption(limitOption);
+        options.addOption(pathOption);
+
+        // Parse command line arguments
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd;
+        
+        try {
+            cmd = parser.parse(options, args);
+        } catch (ParseException e) {
+            System.err.println("Error parsing command line arguments: " + e.getMessage());
+            HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("TrendDetectionJob", options);
+            System.exit(1);
+            return;
+        }
+
+        // Get values from command line or use defaults
+        int limit = DEFAULT_LIMIT;
+        if (cmd.hasOption("l")) {
+            try {
+                limit = Integer.parseInt(cmd.getOptionValue("l"));
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid limit value: " + cmd.getOptionValue("l"));
+                System.exit(1);
+            }
+        }
+
+        String inputDataPath = cmd.getOptionValue("p", DEFAULT_DATA_PATH);
+        
+        // Log the configuration
+        System.out.println("Running with configuration:");
+        System.out.println("  Input path: " + inputDataPath);
+        System.out.println("  Message limit: " + limit);
+
+
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         final ObjectMapper mapper = new ObjectMapper();
+        DataStream<String> input;
 
-        DataStream<String> input = env
-            .fromCollection(lines);
+        if (limit == -1) {
+            FileSource<String> source = FileSource
+                .forRecordStreamFormat(new TextLineInputFormat(), new Path(inputDataPath))
+                .build();
+            
+            input = env.fromSource(
+                    source,
+                    WatermarkStrategy.noWatermarks(),
+                    "JSON-File-Source"
+                );
+        } else {
+            List<String> lines = Files.readAllLines(Paths.get(inputDataPath));
+    
+            if (lines.size() > limit) {
+                lines = lines.subList(0, limit);
+            }
 
-        // DataStream<String> input = env
-        //     .fromSource(
-        //         source,
-        //         WatermarkStrategy.noWatermarks(),
-        //         "JSON-File-Source"
-        //     );
+            input = env.fromCollection(lines);
+        }   
 
         DataStream<InputMessage> messages = input
             .map(new MapFunction<String, InputMessage>() {
@@ -103,7 +141,7 @@ public class TrendDetectionJob {
         // Transform and detect trends
         DataStream<TrendEvent> trendEvents = messages
             .keyBy(message -> message.getLocationId())
-            .process(new TrendDetectionProcessor())
+            .process(new TrendDetectionProcessor(DEFAULT_SOCKET_PATH))
             .name("trend-detection");
 
 

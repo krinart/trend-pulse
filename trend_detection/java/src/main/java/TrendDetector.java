@@ -12,6 +12,7 @@ public class TrendDetector implements Serializable {
     private List<InputMessage> unmatchedMessages;
     private long lastClusteringTime;
     private int unProcessedMessages;
+    private String sockerFilePath;
     private transient PythonServiceClient pythonClient;
     private transient TfidfKeywordExtractor keywordExtractor;
 
@@ -22,7 +23,8 @@ public class TrendDetector implements Serializable {
     private static final int CLUSTERING_INTERVAL_SECONDS = 60;
     private static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
 
-    public TrendDetector() {
+    public TrendDetector(String sockerFilePath) {
+        this.sockerFilePath = sockerFilePath;
         this.trends = new HashMap<>();
         this.unmatchedMessages = new ArrayList<>();
         this.lastClusteringTime = System.currentTimeMillis();
@@ -31,7 +33,7 @@ public class TrendDetector implements Serializable {
     }
 
     private void initTransients() {
-        this.pythonClient = new PythonServiceClient("/tmp/embedding_server.sock");
+        this.pythonClient = new PythonServiceClient(this.sockerFilePath);
         this.keywordExtractor = new TfidfKeywordExtractor();
     }
 
