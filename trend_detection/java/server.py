@@ -81,6 +81,8 @@ def handle_client(connection):
         # Send response
         connection.sendall(json.dumps(response).encode('utf-8'))
 
+    except BrokenPipeError as s:
+        print('BrokenPipeError during request handling')
     except Exception as e:
         error_response = {'error': str(e)}
         connection.sendall(json.dumps(error_response).encode('utf-8'))

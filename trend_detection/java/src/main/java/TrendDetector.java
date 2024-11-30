@@ -155,17 +155,30 @@ public class TrendDetector implements Serializable {
             // Extract keywords
             List<String> keywords = keywordExtractor.extractKeywords(clusterMessages);
             
-            String trendId = "trend_" + currentTime + "_" + String.join("_", keywords);
-            Trend newTrend = new Trend(
-                trendId, 
-                keywords, 
-                clusterMessages, 
-                centroid, 
-                currentTime
-            );
-            
-            trends.put(trendId, newTrend);
-            newTrends.add(newTrend);
+            // Check if this cluster matches any existing trend
+            boolean matchedExisting = false;
+            for (Trend existingTrend : trends.values()) {
+                double similarity = cosineSimilarity(centroid, existingTrend.getCentroid());
+                if (similarity > SIMILARITY_THRESHOLD) {
+                    matchedExisting = true;
+                    break;
+                }
+            }
+
+            if (!matchedExisting) {
+                String trendId = "trend_" + currentTime + "_" + String.join("_", keywords);
+                Trend newTrend = new Trend(
+                    trendId, 
+                    keywords, 
+                    clusterMessages, 
+                    centroid, 
+                    currentTime
+                );
+                
+                trends.put(trendId, newTrend);
+                newTrends.add(newTrend);
+
+            }
         }
         
         return newTrends;

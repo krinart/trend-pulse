@@ -2,7 +2,7 @@ jbuild:
 	mvn clean package
 
 jrun:
-	java -jar target/trend-detection-1.0-SNAPSHOT.jar $(filter-out $@,$(MAKECMDGOALS))
+	java -jar target/trend-detection-1.0-SNAPSHOT.jar -l 100
 
 dbuild:
 	docker-compose build --no-cache
@@ -15,8 +15,3 @@ connect:
 
 frun:
 	docker-compose exec taskmanager-1 java -jar /opt/flink/usrlib/trend-detection-1.0-SNAPSHOT.jar -l 10 -p /opt/flink/data/messages_rows.json
-
-
-
-%:
-	@:
