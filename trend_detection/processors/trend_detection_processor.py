@@ -56,6 +56,8 @@ class TrendDetectionProcessor(KeyedProcessFunction):
 
         for trend in detected_trends:
             
+            # print(f"locations: {trend.debug_location_ids}, trends: {trend.debug_trend_ids}")
+
             # print(f"detected trend({value.timestamp}): {trend.id}, location: {ctx.get_current_key()}")
 
             event_info = {

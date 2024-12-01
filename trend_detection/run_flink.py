@@ -53,7 +53,7 @@ def main():
 
     env = StreamExecutionEnvironment.get_execution_environment()
 
-    output_path = "./output2"
+    output_path = "./output4"
     
     data_stream = env.from_collection(
         collection=data,
