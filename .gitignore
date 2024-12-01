@@ -3,3 +3,4 @@
 __pycache__/
 ui/static-data/data
 trend_detection/output*
+*output*

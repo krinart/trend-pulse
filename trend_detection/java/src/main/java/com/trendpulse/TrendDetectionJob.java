@@ -2,6 +2,7 @@ package com.trendpulse;
 
 import org.apache.commons.cli.*;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import java.time.Duration;
@@ -11,6 +12,8 @@ import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.connector.file.src.reader.TextLineInputFormat;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.java.tuple.Tuple2;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.file.Files;
@@ -20,7 +23,10 @@ import java.util.List;
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.items.TrendEvent;
 import com.trendpulse.lib.LocationUtils;
+import com.trendpulse.processors.TileWriter;
+import com.trendpulse.processors.TimeseriesWriter;
 import com.trendpulse.processors.TrendDetectionProcessor;
+import com.trendpulse.processors.TrendStatsRouter;
 
 
 public class TrendDetectionJob {
@@ -28,6 +34,7 @@ public class TrendDetectionJob {
     // /opt/flink/data/messages_rows.json
     static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows_with_id.json";
     static String DEFAULT_SOCKET_PATH = "/tmp/embedding_server.sock";
+    static String DEFAULT_OUTPUT_PATH = "./output";
     static int DEFAULT_LIMIT = 10;
 
     private static int trendStatsWindowMinutes = 5;
@@ -48,6 +55,13 @@ public class TrendDetectionJob {
             .hasArg()
             .argName("PATH")
             .desc("Path to the input JSON file")
+            .build();
+
+        Option outputOption = Option.builder("o")
+            .longOpt("output")
+            .hasArg()
+            .argName("OUTPUT")
+            .desc("Path for output files")
             .build();
 
         options.addOption(limitOption);
@@ -79,6 +93,7 @@ public class TrendDetectionJob {
         }
 
         String inputDataPath = cmd.getOptionValue("p", DEFAULT_DATA_PATH);
+        String outputPath = cmd.getOptionValue("o", DEFAULT_OUTPUT_PATH);
         String socketPath = System.getenv().getOrDefault("SOCKET_PATH", DEFAULT_SOCKET_PATH);
         
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -148,12 +163,29 @@ public class TrendDetectionJob {
             .process(new TrendDetectionProcessor(socketPath, trendStatsWindowMinutes))
             .name("trend-detection");
 
+        TrendStatsRouter statsRouter = new TrendStatsRouter();
+        SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
+            .process(statsRouter)
+            .name("stats-router");
+            
+        // Get side outputs and attach writers
+        DataStream<Tuple2<String, String>> timeseriesStream = routedStream
+            .getSideOutput(statsRouter.getTimeseriesOutput());
+        timeseriesStream
+            .process(new TimeseriesWriter(outputPath))
+            .name("timeseries-writer");
+            
+        DataStream<Tuple2<String, String>> tileStream = routedStream
+            .getSideOutput(statsRouter.getTileOutput());
+        tileStream
+            .process(new TileWriter(outputPath))
+            .name("tile-writer");
 
-        trendEvents
-            .map(event -> String.format(
-                "%s(%s, %s): %s", 
-                event.getEventType(), event.getTrendId(), event.getLocationId(), event.getEventInfo()))
-            .print();
+        // trendEvents
+        //     .map(event -> String.format(
+        //         "%s(%s, %s): %s", 
+        //         event.getEventType(), event.getTrendId(), event.getLocationId(), event.getEventInfo()))
+        //     .print();
 
         // Execute
         env.execute("Trend Detection Job");
