@@ -24,9 +24,11 @@ public class TrendDetector {
     private int unProcessedMessages;
     private String socketFilePath;
     private Integer locationID;
-    private  PythonServiceClient pythonClient;
+    private PythonServiceClient pythonClient;
     private TfidfKeywordExtractor keywordExtractor;
     
+    private int trendStatsWindowMinutes;
+
     public static final double CLUSTERING_EPS = 0.7;
     public static final int MIN_CLUSTER_SIZE = 10;
 
@@ -35,7 +37,7 @@ public class TrendDetector {
     public static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
     public static final int KEEP_UNMATCHED_MESSAGES_MINUTES = 10;
 
-    public TrendDetector(Integer locationID, String socketFilePath) {
+    public TrendDetector(Integer locationID, String socketFilePath, int trendStatsWindowMinutes) {
         this.locationID = locationID;
         this.socketFilePath = socketFilePath;
         this.trends = new HashMap<>();
@@ -45,6 +47,7 @@ public class TrendDetector {
         this.unProcessedMessages = 0;
         this.pythonClient = new PythonServiceClient(this.socketFilePath);
         this.keywordExtractor = new TfidfKeywordExtractor();
+        this.trendStatsWindowMinutes = trendStatsWindowMinutes;
     }
 
     public ProcessingResult processMessage(InputMessage inputMessage, long currentTime) {
@@ -89,6 +92,8 @@ public class TrendDetector {
         
         return result;
     }
+
+    public List<Trend> getTrends() { return new ArrayList<>(trends.values()); }
 
     private void cleanupOldMessages(long currentTime) {
         if (currentTime < 0 || unmatchedMessages.size() == 0) return;
@@ -300,7 +305,8 @@ public class TrendDetector {
                     keywords, 
                     clusterMessages, 
                     centroid, 
-                    currentTime
+                    currentTime,
+                    this.trendStatsWindowMinutes
                 );
 
                 clusteredMessages.addAll(clusterMessages);

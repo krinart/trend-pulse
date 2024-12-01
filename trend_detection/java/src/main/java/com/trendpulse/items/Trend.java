@@ -4,6 +4,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.io.Serializable;
 
+import com.trendpulse.lib.TrendStatsGrid;
+
 public class Trend implements Serializable {
     private String id;
     private List<String> keywords;
@@ -13,12 +15,14 @@ public class Trend implements Serializable {
     private double[] centroid;
     private int originalMessagesCount;
     private int matchedMessagesCount;
+    
+    private TrendStatsGrid stats;
 
     private Map<Integer, Integer> debugLocationsMap;
     private Map<Integer, Integer> debugTrendsMap;
 
     public Trend(String id, List<String> keywords, List<Message> messages, 
-                double[] centroid, long currentTime) {
+                double[] centroid, long currentTime, int statsWindowMinutes) {
         this.id = id;
         this.keywords = keywords;
         this.messages = new HashSet<>(messages);
@@ -28,11 +32,14 @@ public class Trend implements Serializable {
         this.originalMessagesCount = messages.size();
         this.matchedMessagesCount = 0;
 
+        this.stats = new TrendStatsGrid(statsWindowMinutes);
+
         this.debugLocationsMap = new HashMap<>();
         this.debugTrendsMap = new HashMap<>();
 
         for (Message m: messages) {
             this.updateDebugInfo(m);
+            this.stats.addPoint(m.getDatetime().toInstant(), m.getLat(), m.getLon());
         }
     }
 
@@ -42,6 +49,7 @@ public class Trend implements Serializable {
     public double[] getCentroid() { return centroid; }
     public long getLastUpdate() { return lastUpdate; }
     public Set<Message> getMessages() { return messages; }
+    public TrendStatsGrid getStats() { return stats; }
 
     // Setters
     public void setLastUpdate(long lastUpdate) { this.lastUpdate = lastUpdate; }
@@ -51,16 +59,17 @@ public class Trend implements Serializable {
         this.messages.addAll(messages);
         for (Message m: messages) {
             this.updateDebugInfo(m);
+            this.stats.addPoint(m.getDatetime().toInstant(), m.getLat(), m.getLon());
         }
     }
     public void addMessage(Message message) {
         this.messages.add(message);
         this.updateDebugInfo(message);
+        this.stats.addPoint(message.getDatetime().toInstant(), message.getLat(), message.getLon());
     }
 
     private void updateDebugInfo(Message m) {
         // System.out.println("qwe: " + m.getDLocationId() + "" + m.getDTrendId());
-
 
         Integer locationID = m.getDLocationId();
         Integer trendID = m.getDTrendId();

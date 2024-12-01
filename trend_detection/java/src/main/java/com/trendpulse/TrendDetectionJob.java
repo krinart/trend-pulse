@@ -30,6 +30,8 @@ public class TrendDetectionJob {
     static String DEFAULT_SOCKET_PATH = "/tmp/embedding_server.sock";
     static int DEFAULT_LIMIT = 10;
 
+    private static int trendStatsWindowMinutes = 5;
+
     public static void main(String[] args) throws Exception {
         Options options = new Options();
         
@@ -143,14 +145,14 @@ public class TrendDetectionJob {
         // Transform and detect trends
         DataStream<TrendEvent> trendEvents = messages
             .keyBy(message -> message.getLocationId())
-            .process(new TrendDetectionProcessor(socketPath))
+            .process(new TrendDetectionProcessor(socketPath, trendStatsWindowMinutes))
             .name("trend-detection");
 
 
         trendEvents
             .map(event -> String.format(
                 "%s(%s, %s): %s", 
-                event.getEventType(), event.getLocationId(), event.getEventInfo(), event.getTrendId()))
+                event.getEventType(), event.getTrendId(), event.getLocationId(), event.getEventInfo()))
             .print();
 
         // Execute
