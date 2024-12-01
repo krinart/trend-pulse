@@ -15,6 +15,7 @@ public class Message {
     private double[] embedding;
     private OffsetDateTime datetime;
     
+    private int id;
     private int dTrendId;
     private int dLocationId;
 
@@ -23,6 +24,9 @@ public class Message {
     
     public int getDLocationId() { return dLocationId; }
     public void setDLocationId(int dLocationId) { this.dLocationId = dLocationId; }
+
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
 
     public int getLocationId() { return locationID; }
     public void setLocationId(int locationID) { this.locationID = locationID; }

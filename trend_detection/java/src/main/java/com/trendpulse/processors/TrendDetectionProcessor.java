@@ -35,10 +35,15 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
             throws Exception {
                 
         Integer locationID = ctx.getCurrentKey();
+
+        // if (locationID != 8) {
+        //     return;
+        // }
+
         long timestamp = ctx.timerService().currentWatermark();
 
         if (!trendDetectorsMap.containsKey(locationID)) {
-            trendDetectorsMap.put(locationID, new TrendDetector(socketPath));
+            trendDetectorsMap.put(locationID, new TrendDetector(locationID, socketPath));
         }
 
         TrendDetector trendDetector = this.trendDetectorsMap.get(locationID);

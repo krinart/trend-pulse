@@ -26,7 +26,7 @@ import com.trendpulse.processors.TrendDetectionProcessor;
 public class TrendDetectionJob {
     
     // /opt/flink/data/messages_rows.json
-    static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows.json";
+    static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows_with_id.json";
     static String DEFAULT_SOCKET_PATH = "/tmp/embedding_server.sock";
     static int DEFAULT_LIMIT = 10;
 
@@ -80,7 +80,7 @@ public class TrendDetectionJob {
         String socketPath = System.getenv().getOrDefault("SOCKET_PATH", DEFAULT_SOCKET_PATH);
         
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        // env.setParallelism(4);
+        // env.setParallelism(1);
 
         // Log the configuration
         System.out.println("Running with configuration:");

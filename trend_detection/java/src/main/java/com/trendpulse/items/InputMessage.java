@@ -11,6 +11,7 @@ public class InputMessage {
     private double lat;
     private String text;
     private int locationID;
+    private int id;
 
     private OffsetDateTime datetime;
 
@@ -18,6 +19,8 @@ public class InputMessage {
     private int d_trend_id;
     @JsonProperty("d_location_id")
     private int d_location_id;
+
+    public int getId() { return id; }
 
     public int getDTrendId() { return d_trend_id; }
     public void setDTrendId(int d_trend_id) { this.d_trend_id = d_trend_id; }

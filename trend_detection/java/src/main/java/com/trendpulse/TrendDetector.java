@@ -2,6 +2,7 @@ package com.trendpulse;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.io.FileWriter;
 import java.io.IOException;
 
 import org.apache.commons.math3.ml.clustering.DBSCANClusterer;
@@ -13,7 +14,6 @@ import com.trendpulse.items.Message;
 import com.trendpulse.items.MessagePoint;
 import com.trendpulse.lib.PythonServiceClient;
 import com.trendpulse.lib.TfidfKeywordExtractor;
-import com.trendpulse.processors.TrendDetectionProcessor;
 
 
 public class TrendDetector {
@@ -23,18 +23,20 @@ public class TrendDetector {
     private long lastClusteringTime;
     private int unProcessedMessages;
     private String socketFilePath;
+    private Integer locationID;
     private  PythonServiceClient pythonClient;
     private TfidfKeywordExtractor keywordExtractor;
     
     public static final double CLUSTERING_EPS = 0.7;
-    public static final int MIN_CLUSTER_SIZE = 3;
+    public static final int MIN_CLUSTER_SIZE = 10;
 
     public static final double SIMILARITY_THRESHOLD = 0.8;
     public static final int CLUSTERING_INTERVAL_SECONDS = 60;
     public static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
-    public static final int MIN_KEEP_UNMATCHED_MESSAGES = 60;
+    public static final int KEEP_UNMATCHED_MESSAGES_MINUTES = 10;
 
-    public TrendDetector(String socketFilePath) {
+    public TrendDetector(Integer locationID, String socketFilePath) {
+        this.locationID = locationID;
         this.socketFilePath = socketFilePath;
         this.trends = new HashMap<>();
         this.clusteredMessages = new HashSet<>();
@@ -72,6 +74,9 @@ public class TrendDetector {
         boolean countThresholdMet = unProcessedMessages >= UNPROCESSED_MESSAGES_THRESHOLD;
 
         if (timeThresholdMet || countThresholdMet) {
+            // System.out.println("currentTime: " + currentTime + " | lastClusteringTime: " + lastClusteringTime + " | unmatchedMessages: " + unmatchedMessages.size());
+            // System.out.println("timeThresholdMet: " + timeThresholdMet + " | countThresholdMet: " + countThresholdMet);
+
             this.cleanupOldMessages(currentTime);
             this.cleanupOldTrends(currentTime);
             
@@ -90,7 +95,7 @@ public class TrendDetector {
 
         // System.out.println("cleanupOldMessages diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
 
-        long cutoffTime = currentTime - (MIN_KEEP_UNMATCHED_MESSAGES * 60 * 1000);
+        long cutoffTime = currentTime - (KEEP_UNMATCHED_MESSAGES_MINUTES * 60 * 1000);
         // Only cleanup unmatched messages - clustered ones stay until trend retirement
 
         long initSize = unmatchedMessages.size();
@@ -102,7 +107,7 @@ public class TrendDetector {
     private void cleanupOldTrends(long currentTime) {
         if (currentTime < 0 || trends.size() == 0) return;
 
-        long cutoffTime = currentTime - (MIN_KEEP_UNMATCHED_MESSAGES * 60 * 1000);
+        long cutoffTime = currentTime - (KEEP_UNMATCHED_MESSAGES_MINUTES * 60 * 1000);
 
         List<String> deletedTrendIds = new ArrayList<String>();
 
@@ -133,6 +138,7 @@ public class TrendDetector {
         message.setLon(im.getLon());
         message.setDLocationId(im.getDLocationId());
         message.setDTrendId(im.getDTrendId());
+        message.setId(im.getId());
         
         try {
             PythonServiceClient.EmbeddingResponse response = pythonClient.getEmbedding(im.getText());
@@ -175,13 +181,30 @@ public class TrendDetector {
         // }
     }
 
+    private void writeIds(List<Message> messages, String filePath) {
+
+        String fullPath = "/Users/viktor/workspace/ds2/trend_detection/debug/" + filePath;
+
+        System.out.println(filePath + " - " + messages.size());
+
+        try (FileWriter writer = new FileWriter(fullPath)) {
+            String ids = messages.stream()
+                .map(m -> String.valueOf(m.getId()))
+                .collect(Collectors.joining(","));
+            writer.write(ids);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private List<Trend> detectNewTrends(long currentTime) {
         long startTime = System.currentTimeMillis();
         List<Trend> newTrends = new ArrayList<>();
         
-        if (unmatchedMessages.size() > 0) {
-            // System.out.println("detectNewTrends diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
-        }
+        // if (unmatchedMessages.size() > 0) {
+        //     Long minTimestamp = unmatchedMessages.stream().map(m -> m.getTimestamp()).min(Long::compareTo).get();
+        //     System.out.println(" detectNewTrends diff sec: " + ((currentTime - minTimestamp) / 1000));
+        // }
 
         List<MessagePoint> points = new ArrayList<>();
         for (Message message : unmatchedMessages) {
@@ -191,28 +214,35 @@ public class TrendDetector {
             points.add(new MessagePoint(message));
         }
 
-        // System.out.println("detectNewTrends - clustered: " + clusteredMessages.size() + " unmatched: " + unmatchedMessages.size());
+        String debugStr = "clustered: " + clusteredMessages.size() + " unmatched: " + unmatchedMessages.size();
+        // System.out.println(" detectNewTrends - clustered: " + clusteredMessages.size() + " unmatched: " + unmatchedMessages.size());
 
         DBSCANClusterer<MessagePoint> dbscan = new DBSCANClusterer<>(
             CLUSTERING_EPS, 
             MIN_CLUSTER_SIZE,
             (p1, p2) -> {
-                // Custom distance metric using cosine similarity
-                double[] vec1 = p1;
-                double[] vec2 = p2;
-                
-                double dotProduct = 0.0;
-                double norm1 = 0.0;
-                double norm2 = 0.0;
-                
-                for (int i = 0; i < vec1.length; i++) {
-                    dotProduct += vec1[i] * vec2[i];
-                    norm1 += vec1[i] * vec1[i];
-                    norm2 += vec2[i] * vec2[i];
+                double sum = 0.0;
+                for (int i = 0; i < p1.length; i++) {
+                    sum += Math.pow(p1[i] - p2[i], 2);
                 }
+                return Math.sqrt(sum);
+
+                // // Custom distance metric using cosine similarity
+                // double[] vec1 = p1;
+                // double[] vec2 = p2;
                 
-                double cosineSimilarity = dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
-                return 1.0 - cosineSimilarity;  // Convert to distance
+                // double dotProduct = 0.0;
+                // double norm1 = 0.0;
+                // double norm2 = 0.0;
+                
+                // for (int i = 0; i < vec1.length; i++) {
+                //     dotProduct += vec1[i] * vec2[i];
+                //     norm1 += vec1[i] * vec1[i];
+                //     norm2 += vec2[i] * vec2[i];
+                // }
+                
+                // double cosineSimilarity = dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
+                // return 1.0 - cosineSimilarity;  // Convert to distance
             }
         );
         
@@ -224,34 +254,27 @@ public class TrendDetector {
                 .map(MessagePoint::getMessage)
                 .collect(Collectors.toList());
                 
+            // Set<Integer> debugTrendIDS = clusterMessages.stream().map(m -> m.getDTrendId()).collect(Collectors.toSet());
+            // if (debugTrendIDS.size() > 1) {
+            //     String asd = debugTrendIDS.stream().map(v -> String.valueOf(v)).collect(Collectors.joining("_"));
+            //     String filename = "" + System.currentTimeMillis() + "-" + asd;
+            //     writeIds(clusterMessages, filename);
+            // }
 
-        //     Map<Integer, Integer> debugLocationsMap = new HashMap<>();
         //     Map<Integer, Integer> debugTrendsMap = new HashMap<>();
         //     for (Message m: clusterMessages) {
-        //         Integer locationID = m.getDLocationId();
         //         Integer trendID = m.getDTrendId();
-
-        //         if (!debugLocationsMap.containsKey(locationID)) {
-        //             debugLocationsMap.put(locationID, 0);
-        //         }
-        //         debugLocationsMap.put(locationID, debugLocationsMap.get(locationID)+1);
 
         //         if (!debugTrendsMap.containsKey(trendID)) {
         //             debugTrendsMap.put(trendID, 0);
         //         }
         //         debugTrendsMap.put(trendID, debugTrendsMap.get(trendID)+1);
         //     }
-        //     System.out.println("Cluster: locations: [" + 
-        //         debugLocationsMap.entrySet().stream()
-        //             .map(e -> e.getKey() + ":" + e.getValue())
-        //             .collect(Collectors.joining(",")) + 
-        //         "], trends: [" + 
+        //     System.out.println("Cluster: trends: [" + 
         //         debugTrendsMap.entrySet().stream()
         //             .map(e -> e.getKey() + ":" + e.getValue())
         //             .collect(Collectors.joining(",")) + 
         //    "]");
-
-
 
             // Calculate centroid
             double[] centroid = calculateCentroid(cluster.getPoints());
@@ -290,7 +313,7 @@ public class TrendDetector {
         }
         
         long endTime = System.currentTimeMillis();
-        // System.out.println("detectNewTrends(" + currentTime + "): " + (endTime - startTime) + "ms");
+        System.out.println("detectNewTrends("+locationID+", " + debugStr + ") - " + (endTime - startTime) + "ms");
 
         return newTrends;
     }
