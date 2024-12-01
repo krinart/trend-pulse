@@ -1,10 +1,14 @@
 package com.trendpulse.items;
 
 public class TrendEvent {
-    private String eventType;  // TREND_CREATED or TREND_STATS
+    
+public static String TREND_CREATED = "TREND_CREATED";
+    public static String TREND_STATS = "TREND_STATS";
+    
+    private String eventType;
     private String trendId;
     private int locationId;
-    private String eventInfo;  // JSON string with event details
+    private String eventInfo;
 
     public TrendEvent(String eventType, String trendId, int locationId, String eventInfo) {
     	this.eventType = eventType;

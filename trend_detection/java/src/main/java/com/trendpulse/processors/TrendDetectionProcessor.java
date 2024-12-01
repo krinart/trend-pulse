@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trendpulse.TrendDetector;
@@ -68,6 +69,10 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
         Integer locationId = ctx.getCurrentKey();
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
+        // if (locationId != 8) {
+        //     return;
+        // }
+
         if (!trendDetectorsMap.containsKey(locationId)) {
             trendDetectorsMap.put(locationId, new TrendDetector(locationId, socketPath, trendStatsWindowMinutes));
         }
@@ -79,6 +84,11 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
             for (Trend trend : result.getNewTrends()) {
                 Map<String, Object> eventInfo = new HashMap<>();
                 eventInfo.put("keywords", trend.getKeywords());
+                eventInfo.put("centroid", trend.getCentroid());
+                eventInfo.put(
+                    "sampleMessages", 
+                    trend.getMessages().stream().limit(10).map(m -> m.getText()).collect(Collectors.toList()));
+
                 
                 // Map<String, Object> debug = new HashMap<>();
                 // debug.put("location_ids", trend.getDLocationIds());
@@ -86,7 +96,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 // eventInfo.put("debug", debug);
 
                 TrendEvent event = new TrendEvent(
-                    "TREND_CREATED",
+                    TrendEvent.TREND_CREATED,
                     trend.getId(),
                     locationId,
                     objectMapper.writeValueAsString(eventInfo)
@@ -132,7 +142,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 // eventInfo.put("debug", debug);
 
                 TrendEvent event = new TrendEvent(
-                    "TREND_STATS",
+                    TrendEvent.TREND_STATS,
                     trend.getId(),
                     locationId,
                     objectMapper.writeValueAsString(eventInfo)

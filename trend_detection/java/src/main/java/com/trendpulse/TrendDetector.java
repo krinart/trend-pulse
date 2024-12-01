@@ -319,7 +319,7 @@ public class TrendDetector {
         }
         
         long endTime = System.currentTimeMillis();
-        System.out.println("detectNewTrends("+locationID+", " + debugStr + ") - " + (endTime - startTime) + "ms");
+        // System.out.println("detectNewTrends("+locationID+", " + debugStr + ") - " + (endTime - startTime) + "ms");
 
         return newTrends;
     }

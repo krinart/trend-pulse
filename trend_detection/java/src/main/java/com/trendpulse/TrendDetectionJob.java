@@ -27,6 +27,7 @@ import com.trendpulse.processors.TileWriter;
 import com.trendpulse.processors.TimeseriesWriter;
 import com.trendpulse.processors.TrendDetectionProcessor;
 import com.trendpulse.processors.TrendStatsRouter;
+import com.trendpulse.processors.TrendManagementProcessor;
 
 
 public class TrendDetectionJob {
@@ -180,6 +181,10 @@ public class TrendDetectionJob {
         tileStream
             .process(new TileWriter(outputPath))
             .name("tile-writer");
+
+        trendEvents
+            .filter(e -> e.getEventType() == TrendEvent.TREND_CREATED)
+            .process(new TrendManagementProcessor());
 
         // trendEvents
         //     .map(event -> String.format(
