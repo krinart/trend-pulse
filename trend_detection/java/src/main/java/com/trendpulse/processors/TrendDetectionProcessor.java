@@ -69,9 +69,9 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
         Integer locationId = ctx.getCurrentKey();
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
-        // if (locationId != 8) {
-        //     return;
-        // }
+        if (locationId != 8) {
+            return;
+        }
 
         if (!trendDetectorsMap.containsKey(locationId)) {
             trendDetectorsMap.put(locationId, new TrendDetector(locationId, socketPath, trendStatsWindowMinutes));
@@ -80,8 +80,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
         TrendDetector trendDetector = this.trendDetectorsMap.get(locationId);
         TrendDetector.ProcessingResult result = trendDetector.processMessage(message, ctx.timestamp());
         
-        if (result != null && result.getNewTrends() != null) {
-            for (Trend trend : result.getNewTrends()) {
+        if (result != null ) {
+            for (Trend trend : result.getActivatedTrends()) {
                 Map<String, Object> eventInfo = new HashMap<>();
                 eventInfo.put("keywords", trend.getKeywords());
                 eventInfo.put("centroid", trend.getCentroid());
@@ -96,7 +96,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 // eventInfo.put("debug", debug);
 
                 TrendEvent event = new TrendEvent(
-                    TrendEvent.TREND_CREATED,
+                    TrendEvent.TREND_ACTIVATED,
                     trend.getId(),
                     locationId,
                     objectMapper.writeValueAsString(eventInfo)
@@ -104,6 +104,17 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 
                 out.collect(event);
             }
+        }
+
+        for (Trend trend : result.getDeActivatedTrends()) {
+            TrendEvent event = new TrendEvent(
+                TrendEvent.TREND_DEACTIVATED,
+                trend.getId(),
+                locationId,
+                ""
+            );
+            
+            out.collect(event);
         }
     }
 

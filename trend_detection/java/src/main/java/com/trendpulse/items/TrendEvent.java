@@ -2,8 +2,9 @@ package com.trendpulse.items;
 
 public class TrendEvent {
     
-public static String TREND_CREATED = "TREND_CREATED";
+    public static String TREND_ACTIVATED = "TREND_ACTIVATED";
     public static String TREND_STATS = "TREND_STATS";
+    public static String TREND_DEACTIVATED = "TREND_DEACTIVATED";
     
     private String eventType;
     private String trendId;

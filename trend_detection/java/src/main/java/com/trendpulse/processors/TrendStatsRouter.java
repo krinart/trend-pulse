@@ -13,7 +13,6 @@ import com.trendpulse.items.TrendEvent;
 
 public class TrendStatsRouter extends ProcessFunction<TrendEvent, TrendEvent> {
     
-    private static final String TREND_STATS = "TREND_STATS";
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
     private final OutputTag<Tuple2<String, String>> timeseriesOutput;
@@ -34,7 +33,7 @@ public class TrendStatsRouter extends ProcessFunction<TrendEvent, TrendEvent> {
     
     @Override
     public void processElement(TrendEvent value, Context ctx, Collector<TrendEvent> out) throws Exception {
-        if (!TREND_STATS.equals(value.getEventType())) {
+        if (!TrendEvent.TREND_STATS.equals(value.getEventType())) {
             return;
         }
         

@@ -80,11 +80,11 @@ public class TrendDetector {
             // System.out.println("currentTime: " + currentTime + " | lastClusteringTime: " + lastClusteringTime + " | unmatchedMessages: " + unmatchedMessages.size());
             // System.out.println("timeThresholdMet: " + timeThresholdMet + " | countThresholdMet: " + countThresholdMet);
 
-            this.cleanupOldMessages(currentTime);
-            this.cleanupOldTrends(currentTime);
+            cleanupOldMessages(currentTime);
             
-            List<Trend> newTrends = detectNewTrends(currentTime);
-            result.setNewTrends(newTrends);
+            result.setDeActivatedTrends(cleanupOldTrends(currentTime));
+            
+            result.setActivatedTrends(detectNewTrends(currentTime));
             
             lastClusteringTime = currentTime;
             unProcessedMessages = 0;
@@ -109,29 +109,30 @@ public class TrendDetector {
         // System.out.println("cleanupOldMessages(" + currentTime + "): " + (initSize -endSize));
     }
 
-    private void cleanupOldTrends(long currentTime) {
-        if (currentTime < 0 || trends.size() == 0) return;
+    private List<Trend> cleanupOldTrends(long currentTime) {
+        List<Trend> deActivatedTrends = new ArrayList<Trend>();
+
+        if (currentTime < 0 || trends.size() == 0) return deActivatedTrends;
 
         long cutoffTime = currentTime - (KEEP_UNMATCHED_MESSAGES_MINUTES * 60 * 1000);
 
-        List<String> deletedTrendIds = new ArrayList<String>();
-
-        for (Map.Entry<String, Trend> entry : trends.entrySet()) {
-
-            String trendID = entry.getKey();
-            Trend trend = entry.getValue();
+        for (Trend trend : trends.values()) {
 
             if (trend.getLastUpdate() < cutoffTime) {
-                // System.out.println("Remove trend with " + trend.getMessages().size() + " messages");
+                // Set<Message>s = new HashSet<Message>(clusteredMessages);
+                // s.retainAll(trend.getMessages());
+                // System.out.println(this.locationID + " Remove trend with " + trend.getMessages().size() + " messages | clustered: " + s.size());
                 clusteredMessages.removeAll(trend.getMessages());
                 unmatchedMessages.removeAll(trend.getMessages());
-                deletedTrendIds.add(trendID);
+                deActivatedTrends.add(trend);
             }
         }
 
-        for (String trendID: deletedTrendIds) {
-            trends.remove(trendID);
+        for (Trend trend: deActivatedTrends) {
+            trends.remove(trend.getId());
         }
+
+        return deActivatedTrends;
     }
 
     private Message initializeMessage(InputMessage im) {
@@ -368,9 +369,13 @@ public class TrendDetector {
 
     // Class to hold processing results
     public static class ProcessingResult {
-        private List<Trend> newTrends = new ArrayList<>();
+        private List<Trend> activatedTrends = new ArrayList<>();
+        private List<Trend> deActivatedTrends = new ArrayList<>();
         
-        public List<Trend> getNewTrends() { return newTrends; }
-        public void setNewTrends(List<Trend> newTrends) { this.newTrends = newTrends; }
+        public List<Trend> getActivatedTrends() { return activatedTrends; }
+        public void setActivatedTrends(List<Trend> newTrends) { this.activatedTrends = newTrends; }
+
+        public List<Trend> getDeActivatedTrends() { return deActivatedTrends; }
+        public void setDeActivatedTrends(List<Trend> deActivatedTrends) { this.deActivatedTrends = deActivatedTrends; }
     }
 }

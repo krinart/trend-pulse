@@ -33,7 +33,7 @@ import com.trendpulse.processors.TrendManagementProcessor;
 public class TrendDetectionJob {
     
     // /opt/flink/data/messages_rows.json
-    static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows_with_id.json";
+    static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows_with_id_v26_500.json";
     static String DEFAULT_SOCKET_PATH = "/tmp/embedding_server.sock";
     static String DEFAULT_OUTPUT_PATH = "./output";
     static int DEFAULT_LIMIT = 10;
@@ -164,6 +164,14 @@ public class TrendDetectionJob {
             .process(new TrendDetectionProcessor(socketPath, trendStatsWindowMinutes))
             .name("trend-detection");
 
+
+        trendEvents
+            .filter(e -> e.getEventType() ==  TrendEvent.TREND_DEACTIVATED)
+            .map(event -> String.format(
+                "%s(%s, %s): %s", 
+                event.getEventType(), event.getTrendId(), event.getLocationId(), event.getEventInfo()))
+            .print();
+
         TrendStatsRouter statsRouter = new TrendStatsRouter();
         SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
             .process(statsRouter)
@@ -183,14 +191,8 @@ public class TrendDetectionJob {
             .name("tile-writer");
 
         trendEvents
-            .filter(e -> e.getEventType() == TrendEvent.TREND_CREATED)
+        .filter(e -> e.getEventType() == TrendEvent.TREND_ACTIVATED)
             .process(new TrendManagementProcessor());
-
-        // trendEvents
-        //     .map(event -> String.format(
-        //         "%s(%s, %s): %s", 
-        //         event.getEventType(), event.getTrendId(), event.getLocationId(), event.getEventInfo()))
-        //     .print();
 
         // Execute
         env.execute("Trend Detection Job");
