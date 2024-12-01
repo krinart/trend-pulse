@@ -14,8 +14,7 @@ public class Message {
 
     private double[] embedding;
     private OffsetDateTime datetime;
-    private String clusterTrendId;
-
+    
     private int dTrendId;
     private int dLocationId;
 
@@ -53,7 +52,4 @@ public class Message {
         this.datetime = datetime; 
         this.timestamp = datetime.toInstant().toEpochMilli();
     }
-
-    public String getClusterTrendId() { return clusterTrendId; }
-    public void setClusterTrendId(String trendId) { this.clusterTrendId = trendId; }
 }

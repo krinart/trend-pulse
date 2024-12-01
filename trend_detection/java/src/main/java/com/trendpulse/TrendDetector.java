@@ -13,6 +13,7 @@ import com.trendpulse.items.Message;
 import com.trendpulse.items.MessagePoint;
 import com.trendpulse.lib.PythonServiceClient;
 import com.trendpulse.lib.TfidfKeywordExtractor;
+import com.trendpulse.processors.TrendDetectionProcessor;
 
 
 public class TrendDetector {
@@ -24,7 +25,7 @@ public class TrendDetector {
     private String socketFilePath;
     private  PythonServiceClient pythonClient;
     private TfidfKeywordExtractor keywordExtractor;
-
+    
     public static final double CLUSTERING_EPS = 0.7;
     public static final int MIN_CLUSTER_SIZE = 3;
 
@@ -46,7 +47,7 @@ public class TrendDetector {
 
     public ProcessingResult processMessage(InputMessage inputMessage, long currentTime) {
         ProcessingResult result = new ProcessingResult();
-        
+
         Message message = this.initializeMessage(inputMessage);
 
         boolean matchedExistingTrend = false;
@@ -87,7 +88,7 @@ public class TrendDetector {
     private void cleanupOldMessages(long currentTime) {
         if (currentTime < 0 || unmatchedMessages.size() == 0) return;
 
-        System.out.println("cleanupOldMessages diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
+        // System.out.println("cleanupOldMessages diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
 
         long cutoffTime = currentTime - (MIN_KEEP_UNMATCHED_MESSAGES * 60 * 1000);
         // Only cleanup unmatched messages - clustered ones stay until trend retirement
@@ -95,7 +96,7 @@ public class TrendDetector {
         long initSize = unmatchedMessages.size();
         unmatchedMessages.removeIf(message -> message.getTimestamp() < cutoffTime);
         long endSize = unmatchedMessages.size();
-        System.out.println("cleanupOldMessages(" + currentTime + "): " + (initSize -endSize));
+        // System.out.println("cleanupOldMessages(" + currentTime + "): " + (initSize -endSize));
     }
 
     private void cleanupOldTrends(long currentTime) {
@@ -111,7 +112,7 @@ public class TrendDetector {
             Trend trend = entry.getValue();
 
             if (trend.getLastUpdate() < cutoffTime) {
-                System.out.println("Remove trend with " + trend.getMessages().size() + " messages");
+                // System.out.println("Remove trend with " + trend.getMessages().size() + " messages");
                 clusteredMessages.removeAll(trend.getMessages());
                 unmatchedMessages.removeAll(trend.getMessages());
                 deletedTrendIds.add(trendID);
@@ -179,7 +180,7 @@ public class TrendDetector {
         List<Trend> newTrends = new ArrayList<>();
         
         if (unmatchedMessages.size() > 0) {
-            System.out.println("detectNewTrends diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
+            // System.out.println("detectNewTrends diff sec: " + ((currentTime - unmatchedMessages.get(0).getTimestamp()) / 1000));
         }
 
         List<MessagePoint> points = new ArrayList<>();
@@ -190,7 +191,7 @@ public class TrendDetector {
             points.add(new MessagePoint(message));
         }
 
-        System.out.println("detectNewTrends - clustered: " + clusteredMessages.size() + " unmatched: " + unmatchedMessages.size());
+        // System.out.println("detectNewTrends - clustered: " + clusteredMessages.size() + " unmatched: " + unmatchedMessages.size());
 
         DBSCANClusterer<MessagePoint> dbscan = new DBSCANClusterer<>(
             CLUSTERING_EPS, 
@@ -223,6 +224,35 @@ public class TrendDetector {
                 .map(MessagePoint::getMessage)
                 .collect(Collectors.toList());
                 
+
+        //     Map<Integer, Integer> debugLocationsMap = new HashMap<>();
+        //     Map<Integer, Integer> debugTrendsMap = new HashMap<>();
+        //     for (Message m: clusterMessages) {
+        //         Integer locationID = m.getDLocationId();
+        //         Integer trendID = m.getDTrendId();
+
+        //         if (!debugLocationsMap.containsKey(locationID)) {
+        //             debugLocationsMap.put(locationID, 0);
+        //         }
+        //         debugLocationsMap.put(locationID, debugLocationsMap.get(locationID)+1);
+
+        //         if (!debugTrendsMap.containsKey(trendID)) {
+        //             debugTrendsMap.put(trendID, 0);
+        //         }
+        //         debugTrendsMap.put(trendID, debugTrendsMap.get(trendID)+1);
+        //     }
+        //     System.out.println("Cluster: locations: [" + 
+        //         debugLocationsMap.entrySet().stream()
+        //             .map(e -> e.getKey() + ":" + e.getValue())
+        //             .collect(Collectors.joining(",")) + 
+        //         "], trends: [" + 
+        //         debugTrendsMap.entrySet().stream()
+        //             .map(e -> e.getKey() + ":" + e.getValue())
+        //             .collect(Collectors.joining(",")) + 
+        //    "]");
+
+
+
             // Calculate centroid
             double[] centroid = calculateCentroid(cluster.getPoints());
             

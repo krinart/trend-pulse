@@ -13,8 +13,13 @@ import com.trendpulse.items.TrendEvent;
 import com.trendpulse.items.Trend;
 
 public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, InputMessage, TrendEvent> {
-    private String socketPath;
+
+    private static final long serialVersionUID = 1L;
+
+    private final String socketPath;
     private transient TrendDetector detector;
+
+    private transient Map<Integer, TrendDetector> trendDetectorsMap;
 
     public TrendDetectionProcessor(String socketPath) {
         this.socketPath = socketPath;
@@ -22,16 +27,23 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
 
     @Override
     public void open(Configuration conf) throws Exception {
-        detector = new TrendDetector(socketPath);
+        this.trendDetectorsMap = new HashMap<>();
     }
 
     @Override
     public void processElement(InputMessage message, Context ctx, Collector<TrendEvent> out) 
             throws Exception {
-    
+                
+        Integer locationID = ctx.getCurrentKey();
         long timestamp = ctx.timerService().currentWatermark();
-            
-        TrendDetector.ProcessingResult result = detector.processMessage(message, timestamp);
+
+        if (!trendDetectorsMap.containsKey(locationID)) {
+            trendDetectorsMap.put(locationID, new TrendDetector(socketPath));
+        }
+
+        TrendDetector trendDetector = this.trendDetectorsMap.get(locationID);
+
+        TrendDetector.ProcessingResult result = trendDetector.processMessage(message, timestamp);
         
         if (result != null && result.getNewTrends() != null) {
             for (Trend trend : result.getNewTrends()) {
@@ -40,8 +52,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 
                 TrendEvent event = new TrendEvent(
                     "TREND_CREATED",
-                    trend.getKeywords().toString(),
-                    ctx.getCurrentKey(), // or some other default key
+                    trend.getKeywords().toString() + trend.getDebugInfo(),
+                    locationID,
                     "" + ctx.timerService().currentWatermark()
                 );
                 

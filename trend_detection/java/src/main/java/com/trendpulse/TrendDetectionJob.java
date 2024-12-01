@@ -80,7 +80,7 @@ public class TrendDetectionJob {
         String socketPath = System.getenv().getOrDefault("SOCKET_PATH", DEFAULT_SOCKET_PATH);
         
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
+        // env.setParallelism(4);
 
         // Log the configuration
         System.out.println("Running with configuration:");
