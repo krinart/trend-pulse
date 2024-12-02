@@ -21,14 +21,14 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import com.trendpulse.items.InputMessage;
-import com.trendpulse.items.TrendEvent;
 import com.trendpulse.lib.LocationUtils;
 import com.trendpulse.processors.TileWriter;
 import com.trendpulse.processors.TimeseriesWriter;
 import com.trendpulse.processors.TrendDetectionProcessor;
 import com.trendpulse.processors.TrendStatsRouter;
 import com.trendpulse.processors.TrendManagementProcessor;
-
+import com.trendpulse.schema.TrendEvent;
+import com.trendpulse.schema.EventType;
 
 public class TrendDetectionJob {
     
@@ -166,10 +166,10 @@ public class TrendDetectionJob {
 
 
         trendEvents
-            .filter(e -> e.getEventType() ==  TrendEvent.TREND_DEACTIVATED)
+            .filter(e -> e.getEventType() ==  EventType.TREND_DEACTIVATED)
             .map(event -> String.format(
                 "%s(%s, %s): %s", 
-                event.getEventType(), event.getTrendId(), event.getLocationId(), event.getEventInfo()))
+                event.getEventType(), event.getTrendId(), event.getLocationId(), ""))
             .print();
 
         TrendStatsRouter statsRouter = new TrendStatsRouter();
@@ -191,7 +191,7 @@ public class TrendDetectionJob {
             .name("tile-writer");
 
         trendEvents
-            .filter(e -> e.getEventType() == TrendEvent.TREND_ACTIVATED)
+            .filter(e -> e.getEventType() == EventType.TREND_ACTIVATED)
             .process(new TrendManagementProcessor())
             .setParallelism(1);
 

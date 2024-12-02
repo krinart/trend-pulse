@@ -14,10 +14,11 @@ import com.azure.ai.openai.models.ChatRequestSystemMessage;
 import com.azure.ai.openai.models.ChatRequestUserMessage;
 import com.azure.core.credential.AzureKeyCredential;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import com.trendpulse.items.TrendEvent;
+import com.trendpulse.schema.TrendEvent;
+import com.trendpulse.schema.TrendStatsInfo;
+import com.trendpulse.schema.TrendActivatedInfo;
 import com.trendpulse.items.GlobalTrend;
 import com.trendpulse.items.LocalTrend;
 import com.trendpulse.items.Trend;
@@ -38,20 +39,25 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
     
     @Override
     public void processElement(TrendEvent event, Context ctx, Collector<String> out) throws Exception {
-        String eventType = event.getEventType();
-        
-        if (TrendEvent.TREND_ACTIVATED.equals(eventType)) {
-            processTrendActivated(event, out);
-        } else if (TrendEvent.TREND_STATS.equals(eventType)) {
-            processTrendStats(event, out);
-        } else if (TrendEvent.TREND_DEACTIVATED.equals(eventType)) {
-            processTrendDeactivated(event, out);
+        switch (event.getEventType()) {
+            case TREND_ACTIVATED : {
+                processTrendActivated(event, out);
+                break;
+            }
+            case TREND_STATS: {
+                processTrendStats(event, out);
+                break;
+            }
+            case TREND_DEACTIVATED: {
+                processTrendDeactivated(event, out);
+                break;
+            }
         }
     }
 
     private void processTrendActivated(TrendEvent event, Collector<String> out) throws Exception {
-        String trendId = event.getTrendId();
-        JsonNode eventInfo = objectMapper.readTree(event.getEventInfo());
+        String trendId = event.getTrendId().toString();
+        TrendActivatedInfo eventInfo = (TrendActivatedInfo) event.getInfo();
 
         // Initialize new local trend
         LocalTrend newTrend = initializeLocalTrend(eventInfo, trendId, event.getLocationId());
@@ -129,12 +135,16 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
         return similarTrends;
     }
 
-    private LocalTrend initializeLocalTrend(JsonNode eventInfo, String trendId, int locationId) {
-        List<String> keywords = Arrays.asList(
-            objectMapper.convertValue(eventInfo.get("keywords"), String[].class));
-        double[] centroid = objectMapper.convertValue(eventInfo.get("centroid"), double[].class);
-        List<String> sampleMessages = Arrays.asList(objectMapper.convertValue(eventInfo.get("sampleMessages"), String[].class));
+    private LocalTrend initializeLocalTrend(TrendActivatedInfo eventInfo, String trendId, int locationId) {
+        // List<String> keywords = Arrays.asList(
+        //     objectMapper.convertValue(eventInfo.get("keywords"), String[].class));
+        // double[] centroid = objectMapper.convertValue(eventInfo.get("centroid"), double[].class);
+        // List<String> sampleMessages = Arrays.asList(objectMapper.convertValue(eventInfo.get("sampleMessages"), String[].class));
         
+        List<String> keywords = eventInfo.getKeywords().stream().map(k -> k.toString()).collect(Collectors.toList());
+        double[] centroid = eventInfo.getCentroid().stream().mapToDouble(Double::doubleValue).toArray();;
+        List<String> sampleMessages = eventInfo.getSampleMessages().stream().map(k -> k.toString()).collect(Collectors.toList());        
+
         String name = generateTrendName(keywords, sampleMessages);
 
         return new LocalTrend(trendId, name, keywords, centroid, locationId, sampleMessages);
@@ -191,7 +201,7 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
                             "top 5 keywords: " + keywordsStr + "\n\n" + 
                             "10 sampled messages:\n" + messagesStr + "\n\n" +
                             "Requirements for the name:\n" +
-                            "1. Maximum 2 words\n" +
+                            "1. Maximum 2-3 words (decide which one works best)\n" +
                             "2. Should be descriptive but concise\n" +
                             "3. Should capture the main topic or sentiment\n" +
                             "4. Return ONLY the name, no explanations or quotes";
@@ -218,7 +228,7 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
             String generatedName = response.getChoices().get(0).getMessage().getContent();
             
             // Clean up the name (remove quotes, extra spaces, newlines)
-            generatedName = generatedName.replaceAll("[\"']", "")  // Remove quotes
+            generatedName = generatedName.replaceAll("[\"'.,]", "")  // Remove quotes/punctiation
                                        .replaceAll("\\s+", " ")    // Normalize spaces
                                        .trim();                    // Remove leading/trailing spaces
             

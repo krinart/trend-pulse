@@ -1,5 +1,6 @@
 package com.trendpulse.processors;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.configuration.Configuration;
@@ -15,9 +16,12 @@ import java.util.stream.Collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trendpulse.TrendDetector;
 import com.trendpulse.items.InputMessage;
-import com.trendpulse.items.TrendEvent;
 import com.trendpulse.items.TrendDetected;
 import com.trendpulse.lib.TimeUtils;
+import com.trendpulse.schema.TrendEvent;
+import com.trendpulse.schema.EventType;
+import com.trendpulse.schema.TrendActivatedInfo;
+
 
 public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, InputMessage, TrendEvent> {
 
@@ -100,11 +104,15 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 // eventInfo.put("debug", debug);
 
                 TrendEvent event = new TrendEvent(
-                    TrendEvent.TREND_ACTIVATED,
+                    EventType.TREND_ACTIVATED,
                     trend.getId(),
                     locationId,
-                    objectMapper.writeValueAsString(eventInfo)
-                );
+                    new TrendActivatedInfo(
+                        new ArrayList<>(trend.getKeywords()),
+                        Arrays.asList(ArrayUtils.toObject(trend.getCentroid())),
+                        trend.getMessages().stream().limit(10).map(m -> m.getText()).collect(Collectors.toList())
+                    ))
+                ;
                 
                 out.collect(event);
             }
@@ -112,10 +120,10 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
 
         for (TrendDetected trend : result.getDeActivatedTrends()) {
             TrendEvent event = new TrendEvent(
-                TrendEvent.TREND_DEACTIVATED,
+                EventType.TREND_DEACTIVATED,
                 trend.getId(),
                 locationId,
-                ""
+                null
             );
             
             out.collect(event);
@@ -146,9 +154,9 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
         
         if (trendDetector != null) {
             for (TrendDetected trend : trendDetector.getTrends()) {
-                Map<String, Object> eventInfo = new HashMap<>();
-                eventInfo.put("window_start", windowStart.toString());
-                eventInfo.put("window_end", windowEnd.toString());
+                // Map<String, Object> eventInfo = new HashMap<>();
+                // eventInfo.put("window_start", windowStart.toString());
+                // eventInfo.put("window_end", windowEnd.toString());
                 // eventInfo.put("window_stats", trend.getStats().getWindowStats(windowStart));
 
                 // Map<String, Object> debug = new HashMap<>();
@@ -157,10 +165,10 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 // eventInfo.put("debug", debug);
 
                 TrendEvent event = new TrendEvent(
-                    TrendEvent.TREND_STATS,
+                    EventType.TREND_STATS,
                     trend.getId(),
                     locationId,
-                    objectMapper.writeValueAsString(eventInfo)
+                    trend.getStats().getWindowStats(windowStart)
                 );
 
                 out.collect(event);

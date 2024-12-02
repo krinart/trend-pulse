@@ -3,6 +3,16 @@
   "protocol": "TrendProtocol",
   "types": [
     {
+      "type": "enum",
+      "name": "EventType",
+      "symbols": [
+        "TREND_ACTIVATED",
+        "TREND_STATS",
+        "TREND_DEACTIVATED",
+        "GLOBAL_TREND_STATS"
+      ]
+    },
+    {
       "type": "record",
       "name": "Point",
       "fields": [
@@ -60,7 +70,7 @@
       "type": "record",
       "name": "TrendEvent",
       "fields": [
-        {"name": "eventType", "type": "string"},
+        {"name": "eventType", "type": "EventType"},
         {"name": "trendId", "type": "string"},
         {"name": "locationId", "type": "int"},
         {

@@ -2,18 +2,30 @@ package com.trendpulse.processors;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.dataformat.avro.AvroModule;
+
+import java.time.Instant;
+import java.util.List;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 
-import com.trendpulse.items.TrendEvent;
+import com.trendpulse.schema.TrendEvent;
+import com.trendpulse.schema.TrendStatsInfo;
+import com.trendpulse.schema.EventType;
+import com.trendpulse.schema.TileStats;
+import com.trendpulse.schema.ZoomStats;
 
 public class TrendStatsRouter extends ProcessFunction<TrendEvent, TrendEvent> {
     
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    static {
+        objectMapper.registerModule(new AvroModule()).configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);;
+    }
     
     private final OutputTag<Tuple2<String, String>> timeseriesOutput;
     private final OutputTag<Tuple2<String, String>> tileOutput;
@@ -33,30 +45,30 @@ public class TrendStatsRouter extends ProcessFunction<TrendEvent, TrendEvent> {
     
     @Override
     public void processElement(TrendEvent value, Context ctx, Collector<TrendEvent> out) throws Exception {
-        if (!TrendEvent.TREND_STATS.equals(value.getEventType())) {
+        if (!EventType.TREND_STATS.equals(value.getEventType())) {
             return;
         }
         
-        String trendId = value.getTrendId();
-        JsonNode eventInfo = objectMapper.readTree(value.getEventInfo());
-        String timestamp = eventInfo.get("window_start").asText();
+        String trendId = value.getTrendId().toString();
+        TrendStatsInfo eventInfo = (TrendStatsInfo) value.getInfo();
+        String timestamp = Instant.ofEpochSecond(eventInfo.getWindowStart()).toString();
         
         ObjectNode timeseriesItem = objectMapper.createObjectNode();
         timeseriesItem.put("timestamp", timestamp);
-        timeseriesItem.put("count", eventInfo.get("window_stats").get("count").asInt());
+        timeseriesItem.put("count", eventInfo.getStats().getCount());
         
         ctx.output(timeseriesOutput, new Tuple2<>(trendId, timeseriesItem.toString()));
         
-        JsonNode geoStats = eventInfo.get("window_stats").get("geo_stats");
-        for (JsonNode zoomStats : geoStats) {
-            int zoom = zoomStats.get("zoom").asInt();
-            for (JsonNode tile : zoomStats.get("stats")) {
-                int tileX = tile.get("tile_x").asInt();
-                int tileY = tile.get("tile_y").asInt();
+        List<ZoomStats> geoStats = eventInfo.getStats().getGeoStats();
+        for (ZoomStats zoomStats : geoStats) {
+            int zoom = zoomStats.getZoom();
+            for (TileStats tile : zoomStats.getStats()) {
+                int tileX = tile.getTileX();
+                int tileY = tile.getTileY();
                 
                 String tilePath = String.format("%s/timeseries/%s/%d/%d_%d.json",
                     trendId, timestamp, zoom, tileX, tileY);
-                String tileData = tile.get("sampled_points").toString();
+                String tileData = objectMapper.writeValueAsString(tile.getSampledPoints());
                 
                 ctx.output(tileOutput, new Tuple2<>(tilePath, tileData));
             }
