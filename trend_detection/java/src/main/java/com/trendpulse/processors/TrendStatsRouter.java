@@ -1,8 +1,7 @@
 package com.trendpulse.processors;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.avro.AvroModule;
 
@@ -17,15 +16,16 @@ import org.apache.flink.util.OutputTag;
 import com.trendpulse.schema.TrendEvent;
 import com.trendpulse.schema.TrendStatsInfo;
 import com.trendpulse.schema.EventType;
+import com.trendpulse.schema.Point;
 import com.trendpulse.schema.TileStats;
 import com.trendpulse.schema.ZoomStats;
 
+
 public class TrendStatsRouter extends ProcessFunction<TrendEvent, TrendEvent> {
-    
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-    static {
-        objectMapper.registerModule(new AvroModule()).configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);;
-    }
+
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+        .registerModule(new AvroModule())
+        .addMixIn(Point.class, IgnoreSchemaPropertyConfig.class);
     
     private final OutputTag<Tuple2<String, String>> timeseriesOutput;
     private final OutputTag<Tuple2<String, String>> tileOutput;
@@ -75,3 +75,8 @@ public class TrendStatsRouter extends ProcessFunction<TrendEvent, TrendEvent> {
         }
     }
 }
+
+abstract class IgnoreSchemaPropertyConfig {
+    @JsonIgnore
+    abstract void getSpecificData();
+ }
