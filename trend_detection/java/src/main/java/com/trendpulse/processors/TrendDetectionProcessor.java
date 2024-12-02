@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trendpulse.TrendDetector;
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.items.TrendEvent;
-import com.trendpulse.items.Trend;
+import com.trendpulse.items.TrendDetected;
 import com.trendpulse.lib.TimeUtils;
 
 public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, InputMessage, TrendEvent> {
@@ -85,7 +85,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
         TrendDetector.ProcessingResult result = trendDetector.processMessage(message, ctx.timestamp());
         
         if (result != null ) {
-            for (Trend trend : result.getActivatedTrends()) {
+            for (TrendDetected trend : result.getActivatedTrends()) {
                 Map<String, Object> eventInfo = new HashMap<>();
                 eventInfo.put("keywords", trend.getKeywords());
                 eventInfo.put("centroid", trend.getCentroid());
@@ -110,7 +110,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
             }
         }
 
-        for (Trend trend : result.getDeActivatedTrends()) {
+        for (TrendDetected trend : result.getDeActivatedTrends()) {
             TrendEvent event = new TrendEvent(
                 TrendEvent.TREND_DEACTIVATED,
                 trend.getId(),
@@ -145,7 +145,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
         TrendDetector trendDetector = trendDetectorsMap.get(locationId);
         
         if (trendDetector != null) {
-            for (Trend trend : trendDetector.getTrends()) {
+            for (TrendDetected trend : trendDetector.getTrends()) {
                 Map<String, Object> eventInfo = new HashMap<>();
                 eventInfo.put("window_start", windowStart.toString());
                 eventInfo.put("window_end", windowEnd.toString());

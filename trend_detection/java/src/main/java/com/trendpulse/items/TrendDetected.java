@@ -6,7 +6,7 @@ import java.io.Serializable;
 
 import com.trendpulse.lib.TrendStatsGrid;
 
-public class Trend implements Serializable {
+public class TrendDetected implements Serializable {
     private String id;
     private List<String> keywords;
     private long createdAt;
@@ -21,7 +21,7 @@ public class Trend implements Serializable {
     private Map<Integer, Integer> debugLocationsMap;
     private Map<Integer, Integer> debugTrendsMap;
 
-    public Trend(String id, List<String> keywords, List<Message> messages, 
+    public TrendDetected(String id, List<String> keywords, List<Message> messages, 
                 double[] centroid, long currentTime, int statsWindowMinutes) {
         this.id = id;
         this.keywords = keywords;

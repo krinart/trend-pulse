@@ -8,7 +8,7 @@ import java.io.IOException;
 import org.apache.commons.math3.ml.clustering.DBSCANClusterer;
 import org.apache.commons.math3.ml.clustering.Cluster;
 
-import com.trendpulse.items.Trend;
+import com.trendpulse.items.TrendDetected;
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.items.Message;
 import com.trendpulse.items.MessagePoint;
@@ -17,7 +17,7 @@ import com.trendpulse.lib.TfidfKeywordExtractor;
 
 
 public class TrendDetector {
-    private Map<String, Trend> trends;
+    private Map<String, TrendDetected> trends;
     private Set<Message> clusteredMessages;
     private List<Message> unmatchedMessages;
     private long lastClusteringTime;
@@ -93,7 +93,7 @@ public class TrendDetector {
         return result;
     }
 
-    public List<Trend> getTrends() { return new ArrayList<>(trends.values()); }
+    public List<TrendDetected> getTrends() { return new ArrayList<>(trends.values()); }
 
     private void cleanupOldMessages(long currentTime) {
         if (currentTime < 0 || unmatchedMessages.size() == 0) return;
@@ -109,14 +109,14 @@ public class TrendDetector {
         // System.out.println("cleanupOldMessages(" + currentTime + "): " + (initSize -endSize));
     }
 
-    private List<Trend> cleanupOldTrends(long currentTime) {
-        List<Trend> deActivatedTrends = new ArrayList<Trend>();
+    private List<TrendDetected> cleanupOldTrends(long currentTime) {
+        List<TrendDetected> deActivatedTrends = new ArrayList<TrendDetected>();
 
         if (currentTime < 0 || trends.size() == 0) return deActivatedTrends;
 
         long cutoffTime = currentTime - (KEEP_UNMATCHED_MESSAGES_MINUTES * 60 * 1000);
 
-        for (Trend trend : trends.values()) {
+        for (TrendDetected trend : trends.values()) {
 
             if (trend.getLastUpdate() < cutoffTime) {
                 // Set<Message>s = new HashSet<Message>(clusteredMessages);
@@ -128,7 +128,7 @@ public class TrendDetector {
             }
         }
 
-        for (Trend trend: deActivatedTrends) {
+        for (TrendDetected trend: deActivatedTrends) {
             trends.remove(trend.getId());
         }
 
@@ -163,7 +163,7 @@ public class TrendDetector {
     }
 
     private String matchToTrend(Message message) {
-        for (Map.Entry<String, Trend> entry : trends.entrySet()) {
+        for (Map.Entry<String, TrendDetected> entry : trends.entrySet()) {
             double similarity = cosineSimilarity(message.getEmbedding(), entry.getValue().getCentroid());
             if (similarity > SIMILARITY_THRESHOLD) {
                 return entry.getKey();
@@ -172,7 +172,7 @@ public class TrendDetector {
         return null;
     }
 
-    private void updateTrend(Trend trend, Message message, long timestamp) {
+    private void updateTrend(TrendDetected trend, Message message, long timestamp) {
         trend.addMessage(message);
         trend.setLastUpdate(timestamp);
         // trend.incrementMatchedCount();
@@ -203,9 +203,9 @@ public class TrendDetector {
         }
     }
 
-    private List<Trend> detectNewTrends(long currentTime) {
+    private List<TrendDetected> detectNewTrends(long currentTime) {
         long startTime = System.currentTimeMillis();
-        List<Trend> newTrends = new ArrayList<>();
+        List<TrendDetected> newTrends = new ArrayList<>();
         
         // if (unmatchedMessages.size() > 0) {
         //     Long minTimestamp = unmatchedMessages.stream().map(m -> m.getTimestamp()).min(Long::compareTo).get();
@@ -290,7 +290,7 @@ public class TrendDetector {
             
             // Check if this cluster matches any existing trend
             boolean matchedExisting = false;
-            for (Trend existingTrend : trends.values()) {
+            for (TrendDetected existingTrend : trends.values()) {
                 double similarity = cosineSimilarity(centroid, existingTrend.getCentroid());
                 if (similarity > SIMILARITY_THRESHOLD) {
                     matchedExisting = true;
@@ -301,7 +301,7 @@ public class TrendDetector {
 
             if (!matchedExisting) {
                 String trendId = "trend_" + currentTime + "_" + String.join("_", keywords);
-                Trend newTrend = new Trend(
+                TrendDetected newTrend = new TrendDetected(
                     trendId, 
                     keywords, 
                     clusterMessages, 
@@ -369,13 +369,13 @@ public class TrendDetector {
 
     // Class to hold processing results
     public static class ProcessingResult {
-        private List<Trend> activatedTrends = new ArrayList<>();
-        private List<Trend> deActivatedTrends = new ArrayList<>();
+        private List<TrendDetected> activatedTrends = new ArrayList<>();
+        private List<TrendDetected> deActivatedTrends = new ArrayList<>();
         
-        public List<Trend> getActivatedTrends() { return activatedTrends; }
-        public void setActivatedTrends(List<Trend> newTrends) { this.activatedTrends = newTrends; }
+        public List<TrendDetected> getActivatedTrends() { return activatedTrends; }
+        public void setActivatedTrends(List<TrendDetected> newTrends) { this.activatedTrends = newTrends; }
 
-        public List<Trend> getDeActivatedTrends() { return deActivatedTrends; }
-        public void setDeActivatedTrends(List<Trend> deActivatedTrends) { this.deActivatedTrends = deActivatedTrends; }
+        public List<TrendDetected> getDeActivatedTrends() { return deActivatedTrends; }
+        public void setDeActivatedTrends(List<TrendDetected> deActivatedTrends) { this.deActivatedTrends = deActivatedTrends; }
     }
 }
