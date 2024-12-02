@@ -16,7 +16,11 @@ import com.azure.core.credential.AzureKeyCredential;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.trendpulse.items.TrendEvent;
+import com.trendpulse.items.GlobalTrend;
+import com.trendpulse.items.LocalTrend;
+import com.trendpulse.items.Trend;
 
 public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String> {
     private static final double SIMILARITY_THRESHOLD = 0.8; // Cosine similarity threshold
@@ -29,84 +33,123 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
-    private final Map<String, Trend> localTrends = new HashMap<>();
+    private final Map<String, LocalTrend> localTrends = new HashMap<>();
     private final Map<String, GlobalTrend> globalTrends = new HashMap<>();
     
-    private final Map<String, Set<String>> similarTrends = new HashMap<>();
-
     @Override
     public void processElement(TrendEvent event, Context ctx, Collector<String> out) throws Exception {
+        String eventType = event.getEventType();
+        
+        if (TrendEvent.TREND_ACTIVATED.equals(eventType)) {
+            processTrendActivated(event, out);
+        } else if (TrendEvent.TREND_STATS.equals(eventType)) {
+            processTrendStats(event, out);
+        } else if (TrendEvent.TREND_DEACTIVATED.equals(eventType)) {
+            processTrendDeactivated(event, out);
+        }
+    }
+
+    private void processTrendActivated(TrendEvent event, Collector<String> out) throws Exception {
         String trendId = event.getTrendId();
         JsonNode eventInfo = objectMapper.readTree(event.getEventInfo());
+
+        // Initialize new local trend
+        LocalTrend newTrend = initializeLocalTrend(eventInfo, trendId, event.getLocationId());
+        // System.out.println("----------------------------------------");
+        System.out.println("Incoming trend: " + newTrend.getName());
         
-        if (event.getEventType().equals(TrendEvent.TREND_ACTIVATED)) {
-            String[] keywords = objectMapper.convertValue(eventInfo.get("keywords"), String[].class);
-            String[] sampleMessages = objectMapper.convertValue(eventInfo.get("sampleMessages"), String[].class);
-            double[] centroid = objectMapper.convertValue(eventInfo.get("centroid"), double[].class);
-
-            Trend newTrend = new Trend(trendId, centroid, keywords, sampleMessages, event.getLocationId());
-            generateTrendName(newTrend);
-
-            System.out.println(localTrends.size() + " - Trend(" + trendId + ", "+ newTrend.locationId +") name: " + newTrend.name);
-
-            findAndUpdateSimilarTrends(newTrend);
-            
-            localTrends.put(trendId, newTrend);
-            
-            checkAndUpdateGlobalStatus(newTrend);
-            
-            // out.collect(String.format("Trend processed - ID: %s, Name: %s, Status: %s", 
-            //     trendId, newTrend.name, newTrend.isGlobal ? "GLOBAL" : "LOCAL"));
+        // First check global trends
+        List<TrendWithSimilarity> similarGlobalTrends = findSimilarTrends(
+            new ArrayList<>(globalTrends.values()), 
+            newTrend
+        );
+        
+        if (!similarGlobalTrends.isEmpty() && similarGlobalTrends.get(0).similarity >= SIMILARITY_THRESHOLD) {
+            // System.out.println("Matched existing global trend");
+            GlobalTrend mostSimilarGlobalTrend = (GlobalTrend) similarGlobalTrends.get(0).trend;
+            mostSimilarGlobalTrend.addLocalTrend(newTrend);
+            return;
         }
-    }
 
-    private void findAndUpdateSimilarTrends(Trend newTrend) {
-        Set<String> matchingTrends = new HashSet<>();
+        // Then check local trends
+        List<TrendWithSimilarity> similarLocalTrends = findSimilarTrends(
+            new ArrayList<>(localTrends.values()), 
+            newTrend
+        );
         
-        for (Trend existingTrend : localTrends.values()) {
-            double similarity = calculateCosineSimilarity(newTrend.centroid, existingTrend.centroid);
-
-            System.out.println(String.format("Similarity: \"%s\" - \"%s\": %f", newTrend.name, existingTrend.name, similarity));
-
-            if (existingTrend.locationId != newTrend.locationId && 
-                similarity >= SIMILARITY_THRESHOLD) {
-                
-                matchingTrends.add(existingTrend.trendId);
-                
-                System.out.println(
-                    String.format("Matching trends: \"%s\"(%d) - \"%s\"(%d)", 
-                        newTrend.getName(),
-                        newTrend.getLocationId(),
-                        existingTrend.getName(),
-                        existingTrend.getLocationId()
-                    ));
-
-                // Update similarities for existing trend
-                similarTrends.computeIfAbsent(existingTrend.trendId, k -> new HashSet<>())
-                            .add(newTrend.trendId);
+        // Filter by threshold and convert to LocalTrend objects
+        Set<LocalTrend> matchingLocalTrends = new HashSet<>();
+        for (TrendWithSimilarity similar : similarLocalTrends) {
+            if (similar.similarity >= SIMILARITY_THRESHOLD) {
+                matchingLocalTrends.add((LocalTrend) similar.trend);
             }
         }
-        
-        if (!matchingTrends.isEmpty()) {
-            similarTrends.put(newTrend.trendId, matchingTrends);
+
+        // System.out.println("Matching existing local trends: " + matchingLocalTrends.size());
+
+        // Update similar trends relationships
+        for (LocalTrend similarTrend : matchingLocalTrends) {
+            newTrend.addSimilarTrend(similarTrend);
+            similarTrend.addSimilarTrend(newTrend);
+        }
+
+        // If enough similar trends, create new global trend
+        if (matchingLocalTrends.size() >= 2) { // 2 similar trends + new trend = 3 total
+            // System.out.println("New global trend initialized");
+            matchingLocalTrends.add(newTrend);
+            initializeGlobalTrend(matchingLocalTrends);
+        } else {
+            // System.out.println("Stored as a local trend");
+            // Store as local trend
+            localTrends.put(trendId, newTrend);
         }
     }
 
-    private void checkAndUpdateGlobalStatus(Trend trend) {
-        Set<String> matches = similarTrends.getOrDefault(trend.trendId, new HashSet<>());
+    private static class TrendWithSimilarity {
+        final Trend trend;
+        final double similarity;
+
+        TrendWithSimilarity(Trend trend, double similarity) {
+            this.trend = trend;
+            this.similarity = similarity;
+        }
+    }
+
+    private List<TrendWithSimilarity> findSimilarTrends(List<? extends Trend> trends, Trend targetTrend) {
+        List<TrendWithSimilarity> similarTrends = new ArrayList<>();
         
-        if (matches.size() >= 2) { // We need 2 matches to have 3 total similar trends
-            
-            System.out.println("NEW GLOBAL TREND");
-            
-            // Mark all similar trends as global
-            trend.setGlobal(true);
-            matches.forEach(matchId -> {
-                Trend matchingTrend = localTrends.get(matchId);
-                if (matchingTrend != null) {
-                    matchingTrend.setGlobal(true);
-                }
-            });
+        for (Trend trend : trends) {
+            double similarity = calculateCosineSimilarity(targetTrend.getCentroid(), trend.getCentroid());
+            similarTrends.add(new TrendWithSimilarity(trend, similarity));
+        }
+
+        // Sort by similarity in descending order
+        similarTrends.sort((a, b) -> Double.compare(b.similarity, a.similarity));
+        
+        return similarTrends;
+    }
+
+    private LocalTrend initializeLocalTrend(JsonNode eventInfo, String trendId, int locationId) {
+        List<String> keywords = Arrays.asList(
+            objectMapper.convertValue(eventInfo.get("keywords"), String[].class));
+        double[] centroid = objectMapper.convertValue(eventInfo.get("centroid"), double[].class);
+        List<String> sampleMessages = Arrays.asList(objectMapper.convertValue(eventInfo.get("sampleMessages"), String[].class));
+        
+        String name = generateTrendName(keywords, sampleMessages);
+
+        return new LocalTrend(trendId, name, keywords, centroid, locationId, sampleMessages);
+    }
+
+    private void initializeGlobalTrend(Set<LocalTrend> trends) {
+        String globalTrendId = UUID.randomUUID().toString();
+        GlobalTrend globalTrend = new GlobalTrend(globalTrendId, trends);
+        globalTrends.put(globalTrendId, globalTrend);
+        
+        System.out.println("New global trend: " + trends.stream().map(t -> t.getName()).collect(Collectors.joining(", ")));
+
+        // Remove local trends that are now part of global trend
+        for (LocalTrend trend : trends) {
+            localTrends.remove(trend.getId());
         }
     }
 
@@ -124,13 +167,21 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
-    private void generateTrendName(Trend trend) {
-        String keywordsStr = trend.keywords.stream()
+    private void processTrendStats(TrendEvent event, Collector<String> out) {
+        // Implementation pending
+    }
+
+    private void processTrendDeactivated(TrendEvent event, Collector<String> out) {
+        // Implementation pending
+    }
+
+    private String generateTrendName(List<String> keywords, List<String> sampleMessages) {
+        String keywordsStr = keywords.stream()
             .limit(5)
             .collect(Collectors.joining(", "));
         
         // Get up to 10 sample messages
-        String messagesStr = trend.sampleMessages.stream()
+        String messagesStr = sampleMessages.stream()
             .limit(10)
             .map(msg -> "- " + msg)
             .collect(Collectors.joining("\n"));
@@ -140,7 +191,7 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
                             "top 5 keywords: " + keywordsStr + "\n\n" + 
                             "10 sampled messages:\n" + messagesStr + "\n\n" +
                             "Requirements for the name:\n" +
-                            "1. Maximum 3 words\n" +
+                            "1. Maximum 2 words\n" +
                             "2. Should be descriptive but concise\n" +
                             "3. Should capture the main topic or sentiment\n" +
                             "4. Return ONLY the name, no explanations or quotes";
@@ -172,48 +223,20 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
                                        .trim();                    // Remove leading/trailing spaces
             
             // Set the generated name
-            trend.setName(generatedName);
+            return generatedName;
             
         } catch (Exception e) {
             // If name generation fails, create a fallback name from keywords
-            String fallbackName = trend.keywords.stream()
+            String fallbackName = keywords.stream()
                 .limit(3)
                 .collect(Collectors.joining("_"));
-            trend.setName(fallbackName);
             
-            // Log the error
+                // Log the error
             System.err.println("Failed to generate trend name: " + e.getMessage());
+
+            return fallbackName;
         }
     }
 
-    private class Trend {
-        String trendId;
-        String name;
-        double[] centroid;
-        List<String> keywords;
-        List<String> sampleMessages;
-        int locationId;
-        boolean isGlobal;
-
-        public Trend(String trendId, double[] centroid, String[] keywords, String[] sampleMessages, int locationId) {
-            this.trendId = trendId;
-            this.centroid = centroid;
-            this.keywords = Arrays.asList(keywords);
-            this.sampleMessages = Arrays.asList(sampleMessages);
-            this.locationId = locationId;
-            this.isGlobal = false;
-        }
-
-        public String getName() { return name; }
-        public int getLocationId() { return locationId; }
-
-        public void setName(String name) { this.name = name;  }
-        public void setGlobal(boolean global) { this.isGlobal = global; }
-    }
-
-    private class GlobalTrend extends Trend {
-        public GlobalTrend(String trendId, double[] centroid, String[] keywords, String[] sampleMessages, int locationId) {
-            super(trendId, centroid, keywords, sampleMessages, locationId);
-        }
-    }
+    
 }
