@@ -1,11 +1,9 @@
 package com.trendpulse.lib;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.trendpulse.schema.*;
 import java.time.Instant;
 import java.util.*;
-
-import org.apache.commons.lang3.ArrayUtils;
-
+import java.util.stream.Collectors;
 
 class GridCell {
     private final double lat;
@@ -35,74 +33,6 @@ class GridCell {
     }
 }
 
-class Point {
-    @JsonProperty("lat")
-    private final double lat;
-    
-    @JsonProperty("lon")
-    private final double lon;
-    
-    @JsonProperty("count")
-    private final int count;
-
-    public Point(double lat, double lon, int count) {
-        this.lat = lat;
-        this.lon = lon;
-        this.count = count;
-    }
-}
-
-class TileStats {
-    @JsonProperty("tile_x")
-    private final int tileX;
-    
-    @JsonProperty("tile_y")
-    private final int tileY;
-    
-    @JsonProperty("total_count")
-    private final int totalCount;
-    
-    @JsonProperty("points_count")
-    private final int pointsCount;
-    
-    @JsonProperty("sampled_points")
-    private final List<Point> sampledPoints;
-
-    public TileStats(int tileX, int tileY, int totalCount, int pointsCount, List<Point> sampledPoints) {
-        this.tileX = tileX;
-        this.tileY = tileY;
-        this.totalCount = totalCount;
-        this.pointsCount = pointsCount;
-        this.sampledPoints = sampledPoints;
-    }
-}
-
-class ZoomStats {
-    @JsonProperty("zoom")
-    private final int zoom;
-    
-    @JsonProperty("stats")
-    private final List<TileStats> stats;
-
-    public ZoomStats(int zoom, List<TileStats> stats) {
-        this.zoom = zoom;
-        this.stats = stats;
-    }
-}
-
-class WindowStats {
-    @JsonProperty("count")
-    private final int count;
-    
-    @JsonProperty("geo_stats")
-    private final List<ZoomStats> geoStats;
-
-    public WindowStats(int count, List<ZoomStats> geoStats) {
-        this.count = count;
-        this.geoStats = geoStats;
-    }
-}
-
 public class TrendStatsGrid {
     private final int windowMinutes;
     private final int[] zooms;
@@ -114,10 +44,9 @@ public class TrendStatsGrid {
     private final Map<String, Map<String, GridCell>> cells;
     private final Random random;
 
-    private static final int  DEFAULT_CELL_SIZE_METERS = 1000;
+    private static final int DEFAULT_CELL_SIZE_METERS = 1000;
     private static final int[] DEFAULT_ZOOMS = {3, 6, 9, 12};
     private static final int[] DEFAULT_MAX_POINTS_PER_TILE = {5, 20, 50, 100};
-    
 
     public TrendStatsGrid(int windowMinutes) {
         this(windowMinutes, DEFAULT_ZOOMS, DEFAULT_MAX_POINTS_PER_TILE, DEFAULT_CELL_SIZE_METERS);
@@ -130,7 +59,6 @@ public class TrendStatsGrid {
         this.maxZoom = Arrays.stream(zooms).max().getAsInt();
         this.cellSizeMeters = cellSizeMeters;
         
-        // Calculate grid cell size in degrees
         double[] steps = Utils.metersToDegreesArray(cellSizeMeters);
         this.latStep = steps[0];
         this.lonStep = steps[1];
@@ -150,36 +78,51 @@ public class TrendStatsGrid {
     }
 
     public void addPoint(Instant timestamp, double lat, double lon) {
-        String windowTs = Utils.timestampToWindowStart(timestamp, windowMinutes).toString();
+        String windowTs = TimeUtils.timestampToWindowStart(timestamp, windowMinutes).toString();
         
-        // Get grid cell coordinates
         double[] cellCoords = getCellCoords(lat, lon);
         String cellKey = getCellKey(cellCoords[0], cellCoords[1]);
         
-        // Initialize maps if necessary
         cells.putIfAbsent(windowTs, new HashMap<>());
         Map<String, GridCell> windowCells = cells.get(windowTs);
         
-        // Create or update cell
         windowCells.putIfAbsent(cellKey, new GridCell(cellCoords[0], cellCoords[1]));
         windowCells.get(cellKey).incrementCount();
     }
 
-    public WindowStats getWindowStats(Instant windowStart) {
+    public TrendStatsInfo getWindowStats(Instant windowStart) {
         String ts = windowStart.toString();
+        
+        TrendStatsInfo event = new TrendStatsInfo();
+        event.setWindowStart(windowStart.getEpochSecond());
+        event.setWindowEnd(windowStart.plusSeconds(windowMinutes * 60L).getEpochSecond());
+        
+        WindowStats stats;
         if (!cells.containsKey(ts)) {
-            return new WindowStats(0, Collections.emptyList());
+            stats = createEmptyWindowStats();
+        } else {
+            stats = createWindowStats(cells.get(ts).values());
         }
+        
+        event.setStats(stats);
+        return event;
+    }
 
-        List<GridCell> gridCells = new ArrayList<>(cells.get(ts).values());
+    private WindowStats createEmptyWindowStats() {
+        WindowStats stats = new WindowStats();
+        stats.setCount(0);
+        stats.setGeoStats(Collections.emptyList());
+        return stats;
+    }
+
+    private WindowStats createWindowStats(Collection<GridCell> gridCells) {
         int totalCount = gridCells.stream().mapToInt(GridCell::getCount).sum();
-        List<ZoomStats> result = new ArrayList<>();
+        List<ZoomStats> zoomStatsList = new ArrayList<>();
 
         for (int i = 0; i < zooms.length; i++) {
             int zoom = zooms[i];
             int maxPoints = maxPointsPerTile[i];
 
-            // Create tiles
             Map<String, TileData> tiles = new HashMap<>();
             
             for (GridCell cell : gridCells) {
@@ -189,11 +132,10 @@ public class TrendStatsGrid {
                 tiles.putIfAbsent(tileKey, new TileData());
                 TileData tileData = tiles.get(tileKey);
                 tileData.totalCount += cell.getCount();
-                tileData.points.add(new Point(cell.getLat(), cell.getLon(), cell.getCount()));
+                tileData.points.add(createPoint(cell.getLat(), cell.getLon(), cell.getCount()));
             }
 
-            // Sample points for each tile
-            List<TileStats> stats = new ArrayList<>();
+            List<TileStats> tileStatsList = new ArrayList<>();
             for (Map.Entry<String, TileData> entry : tiles.entrySet()) {
                 String[] coords = entry.getKey().split(":");
                 TileData tileData = entry.getValue();
@@ -203,20 +145,35 @@ public class TrendStatsGrid {
                     int sampleSize = Math.min(maxPoints, points.size());
                     List<Point> sampledPoints = samplePoints(points, sampleSize);
                     
-                    stats.add(new TileStats(
-                        Integer.parseInt(coords[0]),
-                        Integer.parseInt(coords[1]),
-                        tileData.totalCount,
-                        points.size(),
-                        sampledPoints
-                    ));
+                    TileStats tileStats = new TileStats();
+                    tileStats.setTileX(Integer.parseInt(coords[0]));
+                    tileStats.setTileY(Integer.parseInt(coords[1]));
+                    tileStats.setTotalCount(tileData.totalCount);
+                    tileStats.setPointsCount(points.size());
+                    tileStats.setSampledPoints(sampledPoints);
+                    
+                    tileStatsList.add(tileStats);
                 }
             }
 
-            result.add(new ZoomStats(zoom, stats));
+            ZoomStats zoomStats = new ZoomStats();
+            zoomStats.setZoom(zoom);
+            zoomStats.setStats(tileStatsList);
+            zoomStatsList.add(zoomStats);
         }
 
-        return new WindowStats(totalCount, result);
+        WindowStats windowStats = new WindowStats();
+        windowStats.setCount(totalCount);
+        windowStats.setGeoStats(zoomStatsList);
+        return windowStats;
+    }
+
+    private Point createPoint(double lat, double lon, int count) {
+        Point point = new Point();
+        point.setLat(lat);
+        point.setLon(lon);
+        point.setCount(count);
+        return point;
     }
 
     private List<Point> samplePoints(List<Point> points, int sampleSize) {
@@ -224,9 +181,10 @@ public class TrendStatsGrid {
             return new ArrayList<>(points);
         }
         
-        List<Point> shuffled = new ArrayList<>(points);
-        Collections.shuffle(shuffled, random);
-        return shuffled.subList(0, sampleSize);
+        return points.stream()
+            .sorted((p1, p2) -> Integer.compare(p2.getCount(), p1.getCount()))
+            .limit(sampleSize)
+            .collect(Collectors.toList());
     }
 
     private static class TileData {

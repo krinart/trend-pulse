@@ -1,0 +1,77 @@
+{
+  "namespace": "com.trendpulse.schema",
+  "protocol": "TrendProtocol",
+  "types": [
+    {
+      "type": "record",
+      "name": "Point",
+      "fields": [
+        {"name": "lat", "type": "double"},
+        {"name": "lon", "type": "double"},
+        {"name": "count", "type": "int"}
+      ]
+    },
+    {
+      "type": "record",
+      "name": "TileStats",
+      "fields": [
+        {"name": "tileX", "type": "int"},
+        {"name": "tileY", "type": "int"},
+        {"name": "totalCount", "type": "int"},
+        {"name": "pointsCount", "type": "int"},
+        {"name": "sampledPoints", "type": {"type": "array", "items": "Point"}}
+      ]
+    },
+    {
+      "type": "record",
+      "name": "ZoomStats",
+      "fields": [
+        {"name": "zoom", "type": "int"},
+        {"name": "stats", "type": {"type": "array", "items": "TileStats"}}
+      ]
+    },
+    {
+      "type": "record",
+      "name": "WindowStats",
+      "fields": [
+        {"name": "count", "type": "int"},
+        {"name": "geoStats", "type": {"type": "array", "items": "ZoomStats"}}
+      ]
+    },
+    {
+      "type": "record",
+      "name": "TrendStatsInfo",
+      "fields": [
+        {"name": "windowStart", "type": "long"},
+        {"name": "windowEnd", "type": "long"},
+        {"name": "stats", "type": "WindowStats"}
+      ]
+    },
+    {
+      "type": "record",
+      "name": "TrendActivatedInfo",
+      "fields": [
+        {"name": "keywords", "type": {"type": "array", "items": "string"}},
+        {"name": "centroid", "type": {"type": "array", "items": "double"}},
+        {"name": "sampleMessages", "type": {"type": "array", "items": "string"}}
+      ]
+    },
+    {
+      "type": "record",
+      "name": "TrendEvent",
+      "fields": [
+        {"name": "eventType", "type": "string"},
+        {"name": "trendId", "type": "string"},
+        {"name": "locationId", "type": "int"},
+        {
+          "name": "info",
+          "type": [
+            "null",
+            "TrendActivatedInfo",
+            "TrendStatsInfo"
+          ]
+        }
+      ]
+    }
+  ]
+}

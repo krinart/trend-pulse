@@ -149,7 +149,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 Map<String, Object> eventInfo = new HashMap<>();
                 eventInfo.put("window_start", windowStart.toString());
                 eventInfo.put("window_end", windowEnd.toString());
-                eventInfo.put("window_stats", trend.getStats().getWindowStats(windowStart));
+                // eventInfo.put("window_stats", trend.getStats().getWindowStats(windowStart));
 
                 // Map<String, Object> debug = new HashMap<>();
                 // debug.put("location_ids", trend.getDebugLocationIds());
