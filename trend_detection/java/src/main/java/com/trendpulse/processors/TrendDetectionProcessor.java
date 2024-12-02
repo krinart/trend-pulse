@@ -69,9 +69,13 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
         Integer locationId = ctx.getCurrentKey();
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
-        if (locationId != 8) {
-            return;
-        }
+        // if (locationId != 8) {
+        //     return;
+        // }
+
+        // if (message.getDTrendId() != 1) {
+        //     return;
+        // }
 
         if (!trendDetectorsMap.containsKey(locationId)) {
             trendDetectorsMap.put(locationId, new TrendDetector(locationId, socketPath, trendStatsWindowMinutes));

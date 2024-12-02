@@ -191,8 +191,9 @@ public class TrendDetectionJob {
             .name("tile-writer");
 
         trendEvents
-        .filter(e -> e.getEventType() == TrendEvent.TREND_ACTIVATED)
-            .process(new TrendManagementProcessor());
+            .filter(e -> e.getEventType() == TrendEvent.TREND_ACTIVATED)
+            .process(new TrendManagementProcessor())
+            .setParallelism(1);
 
         // Execute
         env.execute("Trend Detection Job");
