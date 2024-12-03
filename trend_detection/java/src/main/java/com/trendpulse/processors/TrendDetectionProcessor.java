@@ -19,6 +19,7 @@ import com.trendpulse.items.InputMessage;
 import com.trendpulse.items.TrendDetected;
 import com.trendpulse.lib.TimeUtils;
 import com.trendpulse.schema.TrendEvent;
+import com.trendpulse.schema.TrendStatsInfo;
 import com.trendpulse.schema.EventType;
 import com.trendpulse.schema.TrendActivatedInfo;
 
@@ -168,7 +169,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                     EventType.TREND_STATS,
                     trend.getId(),
                     locationId,
-                    trend.getStats().getWindowStats(windowStart)
+                    new TrendStatsInfo(trend.getStats().getWindowStats(windowStart))
                 );
 
                 out.collect(event);

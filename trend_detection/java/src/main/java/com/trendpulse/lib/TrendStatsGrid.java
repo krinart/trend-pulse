@@ -90,32 +90,24 @@ public class TrendStatsGrid {
         windowCells.get(cellKey).incrementCount();
     }
 
-    public TrendStatsInfo getWindowStats(Instant windowStart) {
+    public WindowStats getWindowStats(Instant windowStart) {
         String ts = windowStart.toString();
+        WindowStats stats = new WindowStats();
         
-        TrendStatsInfo event = new TrendStatsInfo();
-        event.setWindowStart(windowStart.getEpochSecond());
-        event.setWindowEnd(windowStart.plusSeconds(windowMinutes * 60L).getEpochSecond());
+        stats.setWindowStart(windowStart.getEpochSecond());
+        stats.setWindowEnd(windowStart.plusSeconds(windowMinutes * 60L).getEpochSecond());
         
-        WindowStats stats;
         if (!cells.containsKey(ts)) {
-            stats = createEmptyWindowStats();
+            stats.setCount(0);
+            stats.setGeoStats(Collections.emptyList());
         } else {
-            stats = createWindowStats(cells.get(ts).values());
+            populateWindowStats(stats, cells.get(ts).values());
         }
         
-        event.setStats(stats);
-        return event;
-    }
-
-    private WindowStats createEmptyWindowStats() {
-        WindowStats stats = new WindowStats();
-        stats.setCount(0);
-        stats.setGeoStats(Collections.emptyList());
         return stats;
     }
 
-    private WindowStats createWindowStats(Collection<GridCell> gridCells) {
+    private WindowStats populateWindowStats(WindowStats windowStats, Collection<GridCell> gridCells) {
         int totalCount = gridCells.stream().mapToInt(GridCell::getCount).sum();
         List<ZoomStats> zoomStatsList = new ArrayList<>();
 
@@ -162,7 +154,6 @@ public class TrendStatsGrid {
             zoomStatsList.add(zoomStats);
         }
 
-        WindowStats windowStats = new WindowStats();
         windowStats.setCount(totalCount);
         windowStats.setGeoStats(zoomStatsList);
         return windowStats;

@@ -15,7 +15,7 @@ import org.apache.flink.util.OutputTag;
 
 import com.trendpulse.schema.TrendEvent;
 import com.trendpulse.schema.TrendStatsInfo;
-import com.trendpulse.schema.EventType;
+import com.trendpulse.schema.WindowStats;
 import com.trendpulse.schema.Point;
 import com.trendpulse.schema.TileStats;
 import com.trendpulse.schema.ZoomStats;
@@ -45,21 +45,19 @@ public class TrendStatsRouter extends ProcessFunction<TrendEvent, TrendEvent> {
     
     @Override
     public void processElement(TrendEvent value, Context ctx, Collector<TrendEvent> out) throws Exception {
-        if (!EventType.TREND_STATS.equals(value.getEventType())) {
-            return;
-        }
         
         String trendId = value.getTrendId().toString();
         TrendStatsInfo eventInfo = (TrendStatsInfo) value.getInfo();
-        String timestamp = Instant.ofEpochSecond(eventInfo.getWindowStart()).toString();
+        WindowStats windowStats = eventInfo.getStats();
+        String timestamp = Instant.ofEpochSecond(windowStats.getWindowStart()).toString();
         
         ObjectNode timeseriesItem = objectMapper.createObjectNode();
         timeseriesItem.put("timestamp", timestamp);
-        timeseriesItem.put("count", eventInfo.getStats().getCount());
+        timeseriesItem.put("count", windowStats.getCount());
         
         ctx.output(timeseriesOutput, new Tuple2<>(trendId, timeseriesItem.toString()));
         
-        List<ZoomStats> geoStats = eventInfo.getStats().getGeoStats();
+        List<ZoomStats> geoStats = windowStats.getGeoStats();
         for (ZoomStats zoomStats : geoStats) {
             int zoom = zoomStats.getZoom();
             for (TileStats tile : zoomStats.getStats()) {

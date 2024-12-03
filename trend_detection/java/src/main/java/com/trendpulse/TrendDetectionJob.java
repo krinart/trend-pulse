@@ -174,6 +174,7 @@ public class TrendDetectionJob {
 
         TrendStatsRouter statsRouter = new TrendStatsRouter();
         SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
+            .filter(e -> e.getEventType() == EventType.TREND_STATS)
             .process(statsRouter)
             .name("stats-router");
             

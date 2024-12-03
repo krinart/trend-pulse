@@ -1,6 +1,12 @@
 package com.trendpulse.items;
 
+import java.time.Instant;
 import java.util.*;
+
+import com.trendpulse.schema.Point;
+import com.trendpulse.schema.TileStats;
+import com.trendpulse.schema.WindowStats;
+import com.trendpulse.schema.ZoomStats;
 
 public class GlobalTrend implements Trend {
     private String id;
@@ -9,6 +15,7 @@ public class GlobalTrend implements Trend {
     private List<String> keywords;
     private double[] centroid;
     private Integer locationId;
+    Map<Instant, WindowStats> windowStats = new HashMap<>();
 
     public GlobalTrend(String id, Set<LocalTrend> localTrends) {
         this.id = id;
@@ -20,8 +27,18 @@ public class GlobalTrend implements Trend {
             this.keywords.addAll(trend.getKeywords());
         }
 
+        initializeWindowStats();
+
         // Calculate average centroid and coordinates
         this.centroid = calculateAverageCentroid();
+    }
+
+    private void initializeWindowStats() {
+        for (LocalTrend trend : localTrends) {
+            for (WindowStats ws : trend.getWindowStatsAll()) {
+                this.addLocalTrendWindowStats(Instant.ofEpochSecond(ws.getWindowStart()), ws);
+            }
+        }
     }
 
     private double[] calculateAverageCentroid() {
@@ -44,10 +61,62 @@ public class GlobalTrend implements Trend {
         return avgCentroid;
     }
 
-        public void addLocalTrend(LocalTrend newTrend) {
+    public void addLocalTrend(LocalTrend newTrend) {
         this.localTrends.add(newTrend);
         this.keywords.addAll(newTrend.getKeywords());
         this.centroid = calculateAverageCentroid();
+    }
+
+    public WindowStats getWindowStats(Instant ts) {
+        return windowStats.get(ts);
+    }
+
+    public void addLocalTrendWindowStats(Instant windowTs, WindowStats localTrendWindowStat) {
+        WindowStats existingStats = this.windowStats.computeIfAbsent(windowTs, k -> {
+            WindowStats newStats = new WindowStats();
+            newStats.setWindowStart(localTrendWindowStat.getWindowStart());
+            newStats.setWindowEnd(localTrendWindowStat.getWindowEnd());
+            newStats.setCount(0);
+            newStats.setGeoStats(new ArrayList<>());
+            return newStats;
+        });
+    
+        // Add counts
+        existingStats.setCount(existingStats.getCount() + localTrendWindowStat.getCount());
+    
+        // Merge geo stats for each zoom level
+        Map<Integer, ZoomStats> existingZoomStats = new HashMap<>();
+        for (ZoomStats zs : existingStats.getGeoStats()) {
+            existingZoomStats.put(zs.getZoom(), zs);
+        }
+    
+        for (ZoomStats newZoomStats : localTrendWindowStat.getGeoStats()) {
+            ZoomStats existingZoomStat = existingZoomStats.get(newZoomStats.getZoom());
+            
+            if (existingZoomStat == null) {
+                // If no existing stats for this zoom level, add the new one directly
+                existingStats.getGeoStats().add(newZoomStats);
+                continue;
+            }
+    
+            // Merge tile stats for this zoom level
+            Map<TileKey, TileStats> existingTileStats = new HashMap<>();
+            for (TileStats ts : existingZoomStat.getStats()) {
+                existingTileStats.put(new TileKey(ts.getTileX(), ts.getTileY()), ts);
+            }
+    
+            for (TileStats newTileStats : newZoomStats.getStats()) {
+                TileKey tileKey = new TileKey(newTileStats.getTileX(), newTileStats.getTileY());
+                TileStats existingTileStat = existingTileStats.get(tileKey);
+    
+                if (existingTileStat == null) {
+                    existingZoomStat.getStats().add(newTileStats);
+                } else {
+                    // Merge tile statistics
+                    mergeTileStats(existingTileStat, newTileStats);
+                }
+            }
+        }
     }
 
     @Override public String getId() { return id; }
@@ -58,4 +127,46 @@ public class GlobalTrend implements Trend {
 
     public Set<LocalTrend> getLocalTrends() { return localTrends; }
     public void setName(String name) { this.name = name; }
+
+    // Helper class to use tile coordinates as map key
+private static class TileKey {
+    private final int x;
+    private final int y;
+
+    public TileKey(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TileKey tileKey = (TileKey) o;
+        return x == tileKey.x && y == tileKey.y;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(x, y);
+    }
+}
+
+private void mergeTileStats(TileStats existing, TileStats newStats) {
+    // Update counts
+    existing.setTotalCount(existing.getTotalCount() + newStats.getTotalCount());
+    existing.setPointsCount(existing.getPointsCount() + newStats.getPointsCount());
+
+    // Merge sampled points
+    List<Point> mergedPoints = new ArrayList<>(existing.getSampledPoints());
+    mergedPoints.addAll(newStats.getSampledPoints());
+    
+    // If we have too many points, randomly subsample them
+    if (mergedPoints.size() > 100) { // Adjust sample size as needed
+        Collections.shuffle(mergedPoints);
+        mergedPoints = mergedPoints.subList(0, 100);
+    }
+    
+    existing.setSampledPoints(mergedPoints);
+}
 }

@@ -8,4 +8,7 @@ public interface Trend {
     List<String> getKeywords();
     double[] getCentroid();
     Integer getLocationId();
+
+    // WindowStats getWindowStats(Instant ts);
+    // public void setWindowStats(Instant ts, WindowStats windowStat);
 }

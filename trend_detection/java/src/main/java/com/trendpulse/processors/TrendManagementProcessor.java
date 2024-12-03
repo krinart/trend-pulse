@@ -1,5 +1,6 @@
 package com.trendpulse.processors;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
@@ -18,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.trendpulse.schema.TrendEvent;
 import com.trendpulse.schema.TrendStatsInfo;
+import com.trendpulse.schema.WindowStats;
 import com.trendpulse.schema.TrendActivatedInfo;
 import com.trendpulse.items.GlobalTrend;
 import com.trendpulse.items.LocalTrend;
@@ -36,6 +38,9 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
     
     private final Map<String, LocalTrend> localTrends = new HashMap<>();
     private final Map<String, GlobalTrend> globalTrends = new HashMap<>();
+    
+    // localTrendId -> globalTrend 
+    private final Map<String, GlobalTrend> localMergedTrends = new HashMap<>();
     
     @Override
     public void processElement(TrendEvent event, Context ctx, Collector<String> out) throws Exception {
@@ -73,6 +78,7 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
         if (!similarGlobalTrends.isEmpty() && similarGlobalTrends.get(0).similarity >= SIMILARITY_THRESHOLD) {
             // System.out.println("Matched existing global trend");
             GlobalTrend mostSimilarGlobalTrend = (GlobalTrend) similarGlobalTrends.get(0).trend;
+            localMergedTrends.put(newTrend.getId(), mostSimilarGlobalTrend);
             mostSimilarGlobalTrend.addLocalTrend(newTrend);
             return;
         }
@@ -128,19 +134,13 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
             double similarity = calculateCosineSimilarity(targetTrend.getCentroid(), trend.getCentroid());
             similarTrends.add(new TrendWithSimilarity(trend, similarity));
         }
-
-        // Sort by similarity in descending order
+        
         similarTrends.sort((a, b) -> Double.compare(b.similarity, a.similarity));
         
         return similarTrends;
     }
 
     private LocalTrend initializeLocalTrend(TrendActivatedInfo eventInfo, String trendId, int locationId) {
-        // List<String> keywords = Arrays.asList(
-        //     objectMapper.convertValue(eventInfo.get("keywords"), String[].class));
-        // double[] centroid = objectMapper.convertValue(eventInfo.get("centroid"), double[].class);
-        // List<String> sampleMessages = Arrays.asList(objectMapper.convertValue(eventInfo.get("sampleMessages"), String[].class));
-        
         List<String> keywords = eventInfo.getKeywords().stream().map(k -> k.toString()).collect(Collectors.toList());
         double[] centroid = eventInfo.getCentroid().stream().mapToDouble(Double::doubleValue).toArray();;
         List<String> sampleMessages = eventInfo.getSampleMessages().stream().map(k -> k.toString()).collect(Collectors.toList());        
@@ -154,6 +154,10 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
         String globalTrendId = UUID.randomUUID().toString();
         GlobalTrend globalTrend = new GlobalTrend(globalTrendId, trends);
         globalTrends.put(globalTrendId, globalTrend);
+
+        for (LocalTrend localTrend : trends) {
+            localMergedTrends.put(localTrend.getId(), globalTrend);
+        }
         
         System.out.println("New global trend: " + trends.stream().map(t -> t.getName()).collect(Collectors.joining(", ")));
 
@@ -178,7 +182,23 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
     }
 
     private void processTrendStats(TrendEvent event, Collector<String> out) {
-        // Implementation pending
+        String trendId = event.getTrendId().toString();
+        TrendStatsInfo eventInfo = (TrendStatsInfo) event.getInfo();
+        
+        WindowStats windowStats = eventInfo.getStats();
+        Instant windowStart = Instant.ofEpochSecond(windowStats.getWindowStart());
+
+        if (localMergedTrends.containsKey(trendId)) {
+            localMergedTrends.get(trendId).addLocalTrendWindowStats(windowStart, windowStats);
+            return;
+        }
+
+        if (localTrends.containsKey(trendId)) {
+            localTrends.get(trendId).setWindowStats(windowStart, windowStats);
+            return;
+        }
+
+        System.out.println("Unknown trend id: " + trendId);
     }
 
     private void processTrendDeactivated(TrendEvent event, Collector<String> out) {

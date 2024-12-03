@@ -44,6 +44,8 @@
       "type": "record",
       "name": "WindowStats",
       "fields": [
+        {"name": "windowStart", "type": "long"},
+        {"name": "windowEnd", "type": "long"},
         {"name": "count", "type": "int"},
         {"name": "geoStats", "type": {"type": "array", "items": "ZoomStats"}}
       ]
@@ -52,8 +54,6 @@
       "type": "record",
       "name": "TrendStatsInfo",
       "fields": [
-        {"name": "windowStart", "type": "long"},
-        {"name": "windowEnd", "type": "long"},
         {"name": "stats", "type": "WindowStats"}
       ]
     },
