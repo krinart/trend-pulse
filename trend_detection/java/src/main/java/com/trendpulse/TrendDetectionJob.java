@@ -198,21 +198,21 @@ public class TrendDetectionJob {
         SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
             .keyBy(e -> e.getTopic())
             .process(statsRouter)
-            .setParallelism(1)
+            // .setParallelism(1)
             .name("stats-router");
             
         routedStream
             .getSideOutput(statsRouter.getTimeseriesOutput())
             .keyBy(e -> e.f0)
             .process(new TimeseriesWriter(outputPath))
-            .setParallelism(1)
+            // .setParallelism(1)
             .name("timeseries-writer");
             
             routedStream
             .getSideOutput(statsRouter.getTileOutput())
             .keyBy(e -> e.f0)
             .process(new TileWriter(outputPath))
-            .setParallelism(1)
+            // .setParallelism(1)
             .name("tile-writer");
     }
 }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.avro.AvroModule;
 
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
 
@@ -59,8 +60,9 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
         ObjectNode timeseriesItem = objectMapper.createObjectNode();
         timeseriesItem.put("timestamp", timestamp);
         timeseriesItem.put("count", windowStats.getCount());
-        
-        ctx.output(timeseriesOutput, new Tuple3<>(event.getTopic(), trendId, timeseriesItem.toString()));
+
+        String timeSeriesPath = Paths.get(trendId, "timeseries.json").toString();
+        ctx.output(timeseriesOutput, new Tuple3<>(event.getTopic(), timeSeriesPath, timeseriesItem.toString() + "\n"));
         
         List<ZoomStats> geoStats = windowStats.getGeoStats();
         for (ZoomStats zoomStats : geoStats) {
