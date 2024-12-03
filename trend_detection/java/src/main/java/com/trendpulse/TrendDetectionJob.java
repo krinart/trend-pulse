@@ -196,21 +196,23 @@ public class TrendDetectionJob {
 
     private static void output(DataStream<TrendEvent> trendEvents, String outputPath, TrendStatsRouter statsRouter) {
         SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
-            .filter(e -> e.getEventType() == EventType.TREND_STATS)
+            .keyBy(e -> e.getTopic())
             .process(statsRouter)
+            .setParallelism(1)
             .name("stats-router");
             
-        // Get side outputs and attach writers
-        DataStream<Tuple2<String, String>> timeseriesStream = routedStream
-            .getSideOutput(statsRouter.getTimeseriesOutput());
-        timeseriesStream
+        routedStream
+            .getSideOutput(statsRouter.getTimeseriesOutput())
+            .keyBy(e -> e.f0)
             .process(new TimeseriesWriter(outputPath))
+            .setParallelism(1)
             .name("timeseries-writer");
             
-        DataStream<Tuple2<String, String>> tileStream = routedStream
-            .getSideOutput(statsRouter.getTileOutput());
-        tileStream
+            routedStream
+            .getSideOutput(statsRouter.getTileOutput())
+            .keyBy(e -> e.f0)
             .process(new TileWriter(outputPath))
+            .setParallelism(1)
             .name("tile-writer");
     }
 }

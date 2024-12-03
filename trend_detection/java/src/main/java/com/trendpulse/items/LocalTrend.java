@@ -8,6 +8,7 @@ import com.trendpulse.schema.WindowStats;
 public class LocalTrend implements Trend {
     private String id;
     private String name;
+    private String topic;
     private List<String> keywords;
     private double[] centroid;
     private Integer locationId;
@@ -15,17 +16,23 @@ public class LocalTrend implements Trend {
     private Set<LocalTrend> similarTrends = new HashSet<>();
     private Map<Instant, WindowStats> windowStats = new HashMap<>();
 
-    public LocalTrend(String id, String name, List<String> keywords, double[] centroid, Integer locationId, List<String> sampleMessages) {
+    public LocalTrend(String id, String name, String topic, List<String> keywords, double[] centroid, Integer locationId, List<String> sampleMessages) {
         this.id = id;
         this.name = name;
+        this.topic = topic;
         this.keywords = keywords;
         this.centroid = centroid;
         this.locationId = locationId;
         this.sampleMessages = sampleMessages;
+
+        if (this.topic == null) {
+            throw new IllegalStateException("Local trend has null topic");
+        }
     }
 
     @Override public String getId() { return id; }
     @Override public String getName() { return name; }
+    @Override public String getTopic() { return topic; }
     @Override public List<String> getKeywords() { return keywords; }
     @Override public double[] getCentroid() { return centroid; }
     @Override public Integer getLocationId() { return locationId; }

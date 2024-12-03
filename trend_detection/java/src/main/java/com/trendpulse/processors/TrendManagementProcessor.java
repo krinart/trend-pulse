@@ -79,9 +79,10 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
     private void processTrendActivated(TrendEvent event, Context ctx, Collector<TrendEvent> out) throws Exception {
         String trendId = event.getTrendId().toString();
         TrendActivatedInfo eventInfo = (TrendActivatedInfo) event.getInfo();
+        String topic = event.getTopic().toString();
 
         // Initialize new local trend
-        LocalTrend newTrend = initializeLocalTrend(eventInfo, trendId, event.getLocationId());
+        LocalTrend newTrend = initializeLocalTrend(eventInfo, topic, trendId, event.getLocationId());
         // System.out.println("----------------------------------------");
         System.out.println("Incoming trend: " + newTrend.getName());
         
@@ -211,8 +212,8 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             TrendEvent event = new TrendEvent(
                 EventType.TREND_STATS,
                 trend.getId(),
-                1,
-                "",
+                null,
+                trend.getTopic(),
                 new TrendStatsInfo(windowStats)
             );
 
@@ -243,14 +244,14 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         return similarTrends;
     }
 
-    private LocalTrend initializeLocalTrend(TrendActivatedInfo eventInfo, String trendId, int locationId) {
+    private LocalTrend initializeLocalTrend(TrendActivatedInfo eventInfo, String topic, String trendId, int locationId) {
         List<String> keywords = eventInfo.getKeywords().stream().map(k -> k.toString()).collect(Collectors.toList());
         double[] centroid = eventInfo.getCentroid().stream().mapToDouble(Double::doubleValue).toArray();;
         List<String> sampleMessages = eventInfo.getSampleMessages().stream().map(k -> k.toString()).collect(Collectors.toList());        
 
         String name = generateTrendName(keywords, sampleMessages);
 
-        return new LocalTrend(trendId, name, keywords, centroid, locationId, sampleMessages);
+        return new LocalTrend(trendId, name, topic, keywords, centroid, locationId, sampleMessages);
     }
 
     private void initializeGlobalTrend(Set<LocalTrend> trends) {

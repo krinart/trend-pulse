@@ -72,7 +72,7 @@
       "fields": [
         {"name": "eventType", "type": "EventType"},
         {"name": "trendId", "type": "string"},
-        {"name": "locationId", "type": "int"},
+        {"name": "locationId", "type": ["null", "int"], "default": null},
         {"name": "topic", "type": "string"},
         {
           "name": "info",

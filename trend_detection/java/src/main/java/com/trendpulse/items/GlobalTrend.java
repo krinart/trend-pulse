@@ -11,6 +11,7 @@ import com.trendpulse.schema.ZoomStats;
 public class GlobalTrend implements Trend {
     private String id;
     private String name;
+    private String topic;
     private Set<LocalTrend> localTrends;
     private List<String> keywords;
     private double[] centroid;
@@ -25,6 +26,11 @@ public class GlobalTrend implements Trend {
         this.keywords = new ArrayList<>();
         for (LocalTrend trend : localTrends) {
             this.keywords.addAll(trend.getKeywords());
+            this.topic = trend.getTopic();
+        }
+
+        if (this.topic == null) {
+            throw new IllegalStateException("Global trend has null topic");
         }
 
         initializeWindowStats();
@@ -121,6 +127,7 @@ public class GlobalTrend implements Trend {
 
     @Override public String getId() { return id; }
     @Override public String getName() { return name; }
+    @Override public String getTopic() { return topic; }
     @Override public List<String> getKeywords() { return keywords; }
     @Override public double[] getCentroid() { return centroid; }
     @Override public Integer getLocationId() { return locationId; }
