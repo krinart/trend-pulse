@@ -24,6 +24,7 @@ public class TrendDetector {
     private int unProcessedMessages;
     private String socketFilePath;
     private Integer locationID;
+    private String topic;
     private PythonServiceClient pythonClient;
     private TfidfKeywordExtractor keywordExtractor;
     
@@ -37,8 +38,9 @@ public class TrendDetector {
     public static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
     public static final int KEEP_UNMATCHED_MESSAGES_MINUTES = 10;
 
-    public TrendDetector(Integer locationID, String socketFilePath, int trendStatsWindowMinutes) {
+    public TrendDetector(Integer locationID, String topic, String socketFilePath, int trendStatsWindowMinutes) {
         this.locationID = locationID;
+        this.topic = topic;
         this.socketFilePath = socketFilePath;
         this.trends = new HashMap<>();
         this.clusteredMessages = new HashSet<>();

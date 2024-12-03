@@ -3,6 +3,7 @@ package com.trendpulse.processors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
@@ -13,7 +14,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trendpulse.TrendDetector;
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.items.TrendDetected;
@@ -24,10 +24,9 @@ import com.trendpulse.schema.EventType;
 import com.trendpulse.schema.TrendActivatedInfo;
 
 
-public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, InputMessage, TrendEvent> {
+public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer, String>, InputMessage, TrendEvent> {
 
     private static final long serialVersionUID = 1L;
-    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final String socketPath;
     private final int trendStatsWindowMinutes;
@@ -71,19 +70,20 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
     public void processElement(InputMessage message, Context ctx, Collector<TrendEvent> out) 
             throws Exception {
                 
-        Integer locationId = ctx.getCurrentKey();
+        Integer locationId = ctx.getCurrentKey().f0;
+        String topic = ctx.getCurrentKey().f1;
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
         // if (locationId != 8) {
         //     return;
         // }
 
-        // if (message.getDTrendId() != 1) {
-        //     return;
-        // }
+        if (message.getDTrendId() != 1) {
+            return;
+        }
 
         if (!trendDetectorsMap.containsKey(locationId)) {
-            trendDetectorsMap.put(locationId, new TrendDetector(locationId, socketPath, trendStatsWindowMinutes));
+            trendDetectorsMap.put(locationId, new TrendDetector(locationId, topic, socketPath, trendStatsWindowMinutes));
         }
 
         TrendDetector trendDetector = this.trendDetectorsMap.get(locationId);
@@ -108,6 +108,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                     EventType.TREND_ACTIVATED,
                     trend.getId(),
                     locationId,
+                    topic,
                     new TrendActivatedInfo(
                         new ArrayList<>(trend.getKeywords()),
                         Arrays.asList(ArrayUtils.toObject(trend.getCentroid())),
@@ -124,6 +125,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                 EventType.TREND_DEACTIVATED,
                 trend.getId(),
                 locationId,
+                topic,
                 null
             );
             
@@ -147,7 +149,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
             }
         });
 
-        Integer locationId = ctx.getCurrentKey();
+        Integer locationId = ctx.getCurrentKey().f0;
+        String topic = ctx.getCurrentKey().f1;
         Instant windowEnd = Instant.ofEpochMilli(timestamp);
         Instant windowStart = windowEnd.minus(trendStatsWindowMinutes, ChronoUnit.MINUTES);
 
@@ -169,6 +172,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Integer, Input
                     EventType.TREND_STATS,
                     trend.getId(),
                     locationId,
+                    topic,
                     new TrendStatsInfo(trend.getStats().getWindowStats(windowStart))
                 );
 

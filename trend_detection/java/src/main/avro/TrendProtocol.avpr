@@ -73,6 +73,7 @@
         {"name": "eventType", "type": "EventType"},
         {"name": "trendId", "type": "string"},
         {"name": "locationId", "type": "int"},
+        {"name": "topic", "type": "string"},
         {
           "name": "info",
           "type": [

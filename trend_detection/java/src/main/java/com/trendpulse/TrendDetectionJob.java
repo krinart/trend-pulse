@@ -12,6 +12,7 @@ import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.connector.file.src.reader.TextLineInputFormat;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -158,21 +159,42 @@ public class TrendDetectionJob {
                     .withTimestampAssigner((event, timestamp) -> event.getDatetime().toInstant().toEpochMilli())
             );
 
-        // Transform and detect trends
+        // Detect trends
         DataStream<TrendEvent> trendEvents = messages
-            .keyBy(message -> message.getLocationId())
+            .keyBy(new KeySelector<InputMessage, Tuple2<Integer, String>>() {
+                @Override
+                public Tuple2<Integer, String> getKey(InputMessage message) {
+                    return new Tuple2<>(message.getLocationId(), message.getTopic());
+                }
+            })
             .process(new TrendDetectionProcessor(socketPath, trendStatsWindowMinutes))
             .name("trend-detection");
 
+        // Apply TrendManagementProcessor
+        DataStream<TrendEvent> globalTrendEvents = trendEvents
+            .keyBy(e -> e.getTopic())
+            .process(new TrendManagementProcessor(trendStatsWindowMinutes))
+            .setParallelism(1);
 
+
+        // Write output
+        TrendStatsRouter statsRouter = new TrendStatsRouter();
+        output(trendEvents, outputPath, statsRouter);
+        output(globalTrendEvents, outputPath, statsRouter);
+
+        // DEBUG: Print TREND_DEACTIVATED events
         trendEvents
             .filter(e -> e.getEventType() ==  EventType.TREND_DEACTIVATED)
             .map(event -> String.format(
                 "%s(%s, %s): %s", 
                 event.getEventType(), event.getTrendId(), event.getLocationId(), ""))
-            .print();
+            .print();       
 
-        TrendStatsRouter statsRouter = new TrendStatsRouter();
+        // Execute
+        env.execute("Trend Detection Job");
+    }
+
+    private static void output(DataStream<TrendEvent> trendEvents, String outputPath, TrendStatsRouter statsRouter) {
         SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
             .filter(e -> e.getEventType() == EventType.TREND_STATS)
             .process(statsRouter)
@@ -190,13 +212,5 @@ public class TrendDetectionJob {
         tileStream
             .process(new TileWriter(outputPath))
             .name("tile-writer");
-
-        trendEvents
-            .filter(e -> e.getEventType() == EventType.TREND_ACTIVATED)
-            .process(new TrendManagementProcessor())
-            .setParallelism(1);
-
-        // Execute
-        env.execute("Trend Detection Job");
     }
 }

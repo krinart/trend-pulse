@@ -1,9 +1,14 @@
 package com.trendpulse.processors;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
+
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
 import com.azure.ai.openai.OpenAIClient;
@@ -15,17 +20,16 @@ import com.azure.ai.openai.models.ChatRequestSystemMessage;
 import com.azure.ai.openai.models.ChatRequestUserMessage;
 import com.azure.core.credential.AzureKeyCredential;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.trendpulse.schema.TrendEvent;
 import com.trendpulse.schema.TrendStatsInfo;
 import com.trendpulse.schema.WindowStats;
+import com.trendpulse.schema.EventType;
 import com.trendpulse.schema.TrendActivatedInfo;
 import com.trendpulse.items.GlobalTrend;
 import com.trendpulse.items.LocalTrend;
 import com.trendpulse.items.Trend;
 
-public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String> {
+public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence, TrendEvent, TrendEvent> {
     private static final double SIMILARITY_THRESHOLD = 0.8; // Cosine similarity threshold
     private static String AZURE_OPENAI_ENDPOINT = "https://my-first-open-ai-service.openai.azure.com/";
     private static String AZURE_OPENAI_KEY = "uClNQwvESsEPxSFhKKonjSfIa8KDKUsyzLo7wl0rHzSpTI2qd40fJQQJ99AKACYeBjFXJ3w3AAABACOGgkTy";
@@ -34,33 +38,45 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
         .credential(new AzureKeyCredential(AZURE_OPENAI_KEY))
         .buildClient();
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-    
     private final Map<String, LocalTrend> localTrends = new HashMap<>();
     private final Map<String, GlobalTrend> globalTrends = new HashMap<>();
     
     // localTrendId -> globalTrend 
     private final Map<String, GlobalTrend> localMergedTrends = new HashMap<>();
     
+    int trendStatsWindowMinutes;
+    private transient ListState<Long> scheduledWindows;
+
+    public TrendManagementProcessor(int trendStatsWindowMinutes) {
+        this.trendStatsWindowMinutes = trendStatsWindowMinutes;
+    }
+
     @Override
-    public void processElement(TrendEvent event, Context ctx, Collector<String> out) throws Exception {
+    public void open(Configuration conf) throws Exception {
+        this.scheduledWindows = getRuntimeContext().getListState(
+            new ListStateDescriptor<>("scheduled_windows", Long.class)
+        );
+    }
+
+    @Override
+    public void processElement(TrendEvent event, Context ctx, Collector<TrendEvent> out) throws Exception {
         switch (event.getEventType()) {
             case TREND_ACTIVATED : {
-                processTrendActivated(event, out);
+                processTrendActivated(event, ctx, out);
                 break;
             }
             case TREND_STATS: {
-                processTrendStats(event, out);
+                processTrendStats(event, ctx, out);
                 break;
             }
             case TREND_DEACTIVATED: {
-                processTrendDeactivated(event, out);
+                processTrendDeactivated(event, ctx, out);
                 break;
             }
         }
     }
 
-    private void processTrendActivated(TrendEvent event, Collector<String> out) throws Exception {
+    private void processTrendActivated(TrendEvent event, Context ctx, Collector<TrendEvent> out) throws Exception {
         String trendId = event.getTrendId().toString();
         TrendActivatedInfo eventInfo = (TrendActivatedInfo) event.getInfo();
 
@@ -114,6 +130,93 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
             // System.out.println("Stored as a local trend");
             // Store as local trend
             localTrends.put(trendId, newTrend);
+        }
+    }
+
+    private void processTrendStats(TrendEvent event, Context ctx, Collector<TrendEvent> out) throws Exception {
+        String trendId = event.getTrendId().toString();
+        TrendStatsInfo eventInfo = (TrendStatsInfo) event.getInfo();
+        
+        WindowStats windowStats = eventInfo.getStats();
+        Instant windowStart = Instant.ofEpochSecond(windowStats.getWindowStart());
+
+        scheduleWindowEndCallback(ctx, windowStart);
+
+        if (localMergedTrends.containsKey(trendId)) {
+            localMergedTrends.get(trendId).addLocalTrendWindowStats(windowStart, windowStats);
+            return;
+        }
+
+        if (localTrends.containsKey(trendId)) {
+            localTrends.get(trendId).setWindowStats(windowStart, windowStats);
+            return;
+        }
+
+        System.out.println("Unknown trend id: " + trendId);
+    }
+
+    private void processTrendDeactivated(TrendEvent event, Context ctx, Collector<TrendEvent> out) {
+    }
+
+    private void scheduleWindowEndCallback(Context ctx, Instant windowStart) throws Exception {
+
+        Instant windowEnd = windowStart.plus(trendStatsWindowMinutes, ChronoUnit.MINUTES);
+
+        if (windowEnd.toEpochMilli() < ctx.timerService().currentWatermark()) {
+            return;
+        }
+
+        long windowEndMillis = windowEnd.toEpochMilli();
+
+        // Check if window end is already scheduled
+        boolean isScheduled = false;
+        for (Long scheduled : scheduledWindows.get()) {
+            if (scheduled == windowEndMillis) {
+                isScheduled = true;
+                break;
+            }
+        }
+
+        if (!isScheduled) {
+            ctx.timerService().registerEventTimeTimer(windowEndMillis);
+            scheduledWindows.add(windowEndMillis);
+        }
+    }
+
+    @Override
+    public void onTimer(long timestamp, OnTimerContext ctx, Collector<TrendEvent> out) throws Exception {
+        // Remove this timestamp from scheduled windows
+        List<Long> currentScheduled = new ArrayList<>();
+        scheduledWindows.get().forEach(currentScheduled::add);
+        currentScheduled.remove(timestamp);
+        scheduledWindows.clear();
+        
+        currentScheduled.forEach(t -> {
+            try {
+                scheduledWindows.add(t);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        Instant windowEnd = Instant.ofEpochMilli(timestamp);
+        Instant windowStart = windowEnd.minus(trendStatsWindowMinutes, ChronoUnit.MINUTES);
+
+        for (GlobalTrend trend : globalTrends.values()) {
+            WindowStats windowStats = trend.getWindowStats(windowStart);
+            if (windowStats == null) {
+                continue;
+            }
+
+            TrendEvent event = new TrendEvent(
+                EventType.TREND_STATS,
+                trend.getId(),
+                1,
+                "",
+                new TrendStatsInfo(windowStats)
+            );
+
+            out.collect(event);
         }
     }
 
@@ -179,30 +282,6 @@ public class TrendManagementProcessor extends ProcessFunction<TrendEvent, String
         }
         
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-    }
-
-    private void processTrendStats(TrendEvent event, Collector<String> out) {
-        String trendId = event.getTrendId().toString();
-        TrendStatsInfo eventInfo = (TrendStatsInfo) event.getInfo();
-        
-        WindowStats windowStats = eventInfo.getStats();
-        Instant windowStart = Instant.ofEpochSecond(windowStats.getWindowStart());
-
-        if (localMergedTrends.containsKey(trendId)) {
-            localMergedTrends.get(trendId).addLocalTrendWindowStats(windowStart, windowStats);
-            return;
-        }
-
-        if (localTrends.containsKey(trendId)) {
-            localTrends.get(trendId).setWindowStats(windowStart, windowStats);
-            return;
-        }
-
-        System.out.println("Unknown trend id: " + trendId);
-    }
-
-    private void processTrendDeactivated(TrendEvent event, Collector<String> out) {
-        // Implementation pending
     }
 
     private String generateTrendName(List<String> keywords, List<String> sampleMessages) {
