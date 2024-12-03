@@ -57,6 +57,8 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
         WindowStats windowStats = eventInfo.getStats();
         String timestamp = Instant.ofEpochSecond(windowStats.getWindowStart()).toString();
         
+        // System.out.println("Routed - trend: " + trendId + " | timestamp: " + timestamp );
+
         ObjectNode timeseriesItem = objectMapper.createObjectNode();
         timeseriesItem.put("timestamp", timestamp);
         timeseriesItem.put("count", windowStats.getCount());

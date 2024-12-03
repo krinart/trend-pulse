@@ -179,6 +179,8 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         }
 
         if (!isScheduled) {
+            // System.out.println(Thread.currentThread().getName() + " " + ctx.getCurrentKey() + " Scheduled: " + windowStart.toString());
+
             ctx.timerService().registerEventTimeTimer(windowEndMillis);
             scheduledWindows.add(windowEndMillis);
         }
@@ -203,11 +205,20 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         Instant windowEnd = Instant.ofEpochMilli(timestamp);
         Instant windowStart = windowEnd.minus(trendStatsWindowMinutes, ChronoUnit.MINUTES);
 
+        // System.out.println(Thread.currentThread().getName() + " " + ctx.getCurrentKey() + " onTimer: " + windowStart.toString());
+
         for (GlobalTrend trend : globalTrends.values()) {
+
+            if (!trend.getTopic().contentEquals(ctx.getCurrentKey())) {
+                continue;
+            }
+
             WindowStats windowStats = trend.getWindowStats(windowStart);
             if (windowStats == null) {
                 continue;
             }
+
+            // System.out.println(Thread.currentThread().getName() + " " + ctx.getCurrentKey() + " Emitted - trend: " + trend.getId() + " | timestamp: " + windowStart.toString() );
 
             TrendEvent event = new TrendEvent(
                 EventType.TREND_STATS,

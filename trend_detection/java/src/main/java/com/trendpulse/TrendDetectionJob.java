@@ -4,6 +4,7 @@ import org.apache.commons.cli.*;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -14,16 +15,19 @@ import org.apache.flink.connector.file.src.reader.TextLineInputFormat;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.lib.LocationUtils;
-import com.trendpulse.processors.TileWriter;
 import com.trendpulse.processors.TimeseriesWriter;
 import com.trendpulse.processors.TrendDetectionProcessor;
 import com.trendpulse.processors.TrendStatsRouter;
@@ -174,8 +178,8 @@ public class TrendDetectionJob {
         DataStream<TrendEvent> globalTrendEvents = trendEvents
             .keyBy(e -> e.getTopic())
             .process(new TrendManagementProcessor(trendStatsWindowMinutes))
-            .setParallelism(1);
-
+            // .setParallelism(1)
+        ;
 
         // Write output
         TrendStatsRouter statsRouter = new TrendStatsRouter();
@@ -202,17 +206,62 @@ public class TrendDetectionJob {
             .name("stats-router");
             
         routedStream
-            .getSideOutput(statsRouter.getTimeseriesOutput())
-            .keyBy(e -> e.f0)
-            .process(new TimeseriesWriter(outputPath))
-            // .setParallelism(1)
-            .name("timeseries-writer");
-            
-            routedStream
             .getSideOutput(statsRouter.getTileOutput())
             .keyBy(e -> e.f0)
-            .process(new TileWriter(outputPath))
+            .addSink(new CustomFileSink(outputPath, false))
             // .setParallelism(1)
             .name("tile-writer");
+
+        routedStream
+            .getSideOutput(statsRouter.getTimeseriesOutput())
+            .keyBy(e -> e.f0)
+            .addSink(new CustomFileSink(outputPath, true))
+            // .setParallelism(1)
+            .name("timeseries-writer");
+
+        // routedStream
+        //     .getSideOutput(statsRouter.getTileOutput())
+        //     .keyBy(e -> e.f0)
+        //     .process(new TileWriter(outputPath))
+        //     // .setParallelism(1)
+        //     .name("tile-writer");
+
+        // routedStream
+        //     .getSideOutput(statsRouter.getTimeseriesOutput())
+        //     .keyBy(e -> e.f0)
+        //     .process(new TimeseriesWriter(outputPath))
+        //     // .setParallelism(1)
+        //     .name("timeseries-writer");
+        
     }
+    
+    static class CustomFileSink extends RichSinkFunction<Tuple3<CharSequence, String, String>> {
+
+        private final String basePath;
+        private final boolean append;
+    
+        public CustomFileSink(String basePath, boolean append) {
+            this.basePath = basePath;
+            this.append = append;
+        }
+        
+        @Override
+        public void invoke(Tuple3<CharSequence, String, String> value, Context context) throws IOException {
+
+            // Extract the file path and content from the tuple
+            String filePath = value.f1; // Target file path
+            String content = value.f2; // Content to write (third element)
+
+            String fullPath = Paths.get(basePath, filePath).toString();
+
+            Files.createDirectories(Paths.get(fullPath).getParent());
+
+            // Open the file in append mode and write the content
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(fullPath, append))) {
+                writer.write(content);
+            }
+        }
+    }
+
 }
+

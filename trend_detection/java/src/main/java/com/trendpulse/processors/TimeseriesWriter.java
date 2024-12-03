@@ -25,6 +25,8 @@ public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<
 
         // Create directories if they don't exist
         Files.createDirectories(Paths.get(fullPath).getParent());
+
+        // System.out.println("Printed: " + filePath + "  -  " + line);
         
         // Write line to file
         Files.write(
