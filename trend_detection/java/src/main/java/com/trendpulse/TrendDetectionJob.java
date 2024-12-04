@@ -73,6 +73,7 @@ public class TrendDetectionJob {
 
         options.addOption(limitOption);
         options.addOption(pathOption);
+        options.addOption(outputOption);
 
         // Parse command line arguments
         CommandLineParser parser = new DefaultParser();

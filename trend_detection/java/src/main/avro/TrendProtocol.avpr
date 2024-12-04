@@ -9,7 +9,7 @@
         "TREND_ACTIVATED",
         "TREND_STATS",
         "TREND_DEACTIVATED",
-        "TREND_UPDATED"
+        "TREND_DATA_WRITTEN"
       ]
     },
     {

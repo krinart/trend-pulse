@@ -10,6 +10,7 @@ import numpy as np
 from threading import Thread
 from queue import Queue
 import threading
+import time
 
 SOCKET_PATH = os.environ.get('SOCKET_PATH', '/tmp/embedding_server.sock')
 MAX_WORKERS = 4  # Adjust based on your CPU cores
@@ -56,8 +57,11 @@ def preprocess_text(text):
 
 def process_request(connection):
     try:
-        # Receive data with timeout
-        connection.settimeout(5.0)  # 5 second timeout
+        start_total = time.time()
+        
+        # Receive data
+        start_receive = time.time()
+        connection.settimeout(5.0)
         data = b''
         while True:
             try:
@@ -67,34 +71,35 @@ def process_request(connection):
                 data += chunk
             except socket.timeout:
                 break
+        receive_time = time.time() - start_receive
 
-        # Parse and process request
+        # Parse and process
+        start_process = time.time()
         request = json.loads(data.decode('utf-8'))
         text = request.get('text', '')
         processed_text = preprocess_text(text)
+        process_time = time.time() - start_process
+
+        # Model inference
+        start_model = time.time()
         embedding = model.encode([processed_text])[0]
+        model_time = time.time() - start_model
 
-        print(f"original: {text[:50]}, processed: {processed_text[:50]}")
-
-        # Prepare and send response
+        # Response preparation and sending
+        start_send = time.time()
         response = {
             'original_text': text,
             'processed_text': processed_text,
             'embedding': embedding.tolist()
         }
         connection.sendall(json.dumps(response).encode('utf-8'))
+        send_time = time.time() - start_send
+
+        total_time = time.time() - start_total
+        # print(f"Timing breakdown: total={total_time:.3f}s (receive={receive_time:.3f}s, process={process_time:.3f}s, model={model_time:.3f}s, send={send_time:.3f}s)")
 
     except Exception as e:
-        error_response = {'error': str(e)}
-        try:
-            connection.sendall(json.dumps(error_response).encode('utf-8'))
-        except:
-            pass
-    finally:
-        try:
-            connection.close()
-        except:
-            pass
+        print(f"Error processing request: {str(e)}")
 
 def worker():
     while True:
@@ -122,6 +127,8 @@ def main():
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(SOCKET_PATH)
     server.listen(MAX_WORKERS * 2)  # Allow more pending connections
+
+    os.chmod(SOCKET_PATH, 0o777)
 
     # Start worker threads
     workers = []

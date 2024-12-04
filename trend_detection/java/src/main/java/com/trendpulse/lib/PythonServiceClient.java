@@ -17,6 +17,8 @@ public class PythonServiceClient {
     }
 
     public EmbeddingResponse getEmbedding(String text) throws IOException {
+        long startTime = System.currentTimeMillis();
+
         Map<String, String> request = Map.of("text", text);
         
         try (AFUNIXSocket socket = AFUNIXSocket.newInstance()) {
@@ -33,6 +35,9 @@ public class PythonServiceClient {
             try (InputStream in = socket.getInputStream()) {
                 Map<String, Object> response = mapper.readValue(in, Map.class);
                 
+                long endTime = System.currentTimeMillis();
+                // System.out.println("Total socket call time: " + (endTime - startTime) + "ms");
+
                 if (response.containsKey("error")) {
                     throw new IOException("Server error: " + response.get("error"));
                 }

@@ -25,7 +25,7 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
         taskmanager.memory.process.size: 2048m
-      - SOCKET_PATH=/tmp/embedding_server_1.sock
+      - SOCKET_PATH=/tmp/embedding_server.sock
     volumes:
       - ./target:/opt/flink/usrlib
       - embedding-sockets-1:/tmp
@@ -36,9 +36,17 @@ services:
       context: .
       dockerfile: Dockerfile.python
     environment:
-      - SOCKET_PATH=/tmp/embedding_server_1.sock
+      - SOCKET_PATH=/tmp/embedding_server.sock
     volumes:
       - embedding-sockets-1:/tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
 
   taskmanager-2:
     image: flink:1.18.0-java11
@@ -52,7 +60,7 @@ services:
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
         taskmanager.memory.process.size: 2048m
-      - SOCKET_PATH=/tmp/embedding_server_2.sock
+      - SOCKET_PATH=/tmp/embedding_server.sock
     volumes:
       - ./target:/opt/flink/usrlib
       - embedding-sockets-2:/tmp
@@ -61,9 +69,17 @@ services:
   embedding-server-2:
     image: java-embedding-server-1:latest
     environment:
-      - SOCKET_PATH=/tmp/embedding_server_2.sock
+      - SOCKET_PATH=/tmp/embedding_server.sock
     volumes:
       - embedding-sockets-2:/tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
 
 volumes:
   embedding-sockets-1:
