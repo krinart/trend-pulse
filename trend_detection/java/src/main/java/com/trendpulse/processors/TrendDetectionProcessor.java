@@ -74,7 +74,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         String topic = ctx.getCurrentKey().f1;
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
-        // if (locationId != 8) {
+        // if (locationId != 3) {
         //     return;
         // }
 
@@ -91,12 +91,12 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         
         if (result != null ) {
             for (TrendDetected trend : result.getActivatedTrends()) {
-                Map<String, Object> eventInfo = new HashMap<>();
-                eventInfo.put("keywords", trend.getKeywords());
-                eventInfo.put("centroid", trend.getCentroid());
-                eventInfo.put(
-                    "sampleMessages", 
-                    trend.getMessages().stream().limit(10).map(m -> m.getText()).collect(Collectors.toList()));
+                // Map<String, Object> eventInfo = new HashMap<>();
+                // eventInfo.put("keywords", trend.getKeywords());
+                // eventInfo.put("centroid", trend.getCentroid());
+                // eventInfo.put(
+                //     "sampleMessages", 
+                //     trend.getMessages().stream().limit(10).map(m -> m.getText()).collect(Collectors.toList()));
 
                 
                 // Map<String, Object> debug = new HashMap<>();
@@ -158,6 +158,12 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         
         if (trendDetector != null) {
             for (TrendDetected trend : trendDetector.getTrends()) {
+
+                // Do not emit stats too early
+                if (windowEnd.toEpochMilli() < trend.getCreatedAt()) {
+                    continue;
+                }
+
                 // Map<String, Object> eventInfo = new HashMap<>();
                 // eventInfo.put("window_start", windowStart.toString());
                 // eventInfo.put("window_end", windowEnd.toString());

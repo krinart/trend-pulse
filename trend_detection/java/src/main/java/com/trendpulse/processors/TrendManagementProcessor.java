@@ -84,7 +84,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         // Initialize new local trend
         LocalTrend newTrend = initializeLocalTrend(eventInfo, topic, trendId, event.getLocationId());
         // System.out.println("----------------------------------------");
-        // System.out.println("Incoming trend: " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
+        System.out.println("Incoming trend: " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
         
         // First check global trends
         List<TrendWithSimilarity> similarGlobalTrends = findSimilarTrends(
@@ -124,7 +124,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
 
         // If enough similar trends, create new global trend
         if (matchingLocalTrends.size() >= 2) { // 2 similar trends + new trend = 3 total
-            // System.out.println("New global trend initialized: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()));
+            System.out.println("New global trend initialized: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()));
             matchingLocalTrends.add(newTrend);
             initializeGlobalTrend(matchingLocalTrends);
         } else {
@@ -220,7 +220,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             }
 
             // System.out.println(Thread.currentThread().getName() + " " + ctx.getCurrentKey() + " Emitted - trend: " + trend.getId() + " | timestamp: " + windowStart.toString() );
-            System.out.println("Emitted - trend: " + trend.getId() + " | timestamp: " + windowStart.toString() );
+            // System.out.println("Emitted - trend: " + trend.getId() + " | timestamp: " + windowStart.toString() );
 
             TrendEvent event = new TrendEvent(
                 EventType.TREND_STATS,

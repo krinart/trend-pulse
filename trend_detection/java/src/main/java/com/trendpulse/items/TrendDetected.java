@@ -50,6 +50,7 @@ public class TrendDetected implements Serializable {
     public long getLastUpdate() { return lastUpdate; }
     public Set<Message> getMessages() { return messages; }
     public TrendStatsGrid getStats() { return stats; }
+    public long getCreatedAt() { return createdAt; }
 
     // Setters
     public void setLastUpdate(long lastUpdate) { this.lastUpdate = lastUpdate; }

@@ -221,19 +221,21 @@ public class TrendDetectionJob {
         //     .name("timeseries-writer")
         // ;
 
-        routedStream
+        DataStream<TrendEvent> timeSeriesWriter = routedStream
             .getSideOutput(statsRouter.getTileOutput())
             .keyBy(e -> e.f0)
             .process(new TimeseriesWriter(outputPath, false))
             // .setParallelism(1)
             .name("tile-writer");
 
-        routedStream
+        DataStream<TrendEvent> tilesWriter = routedStream
             .getSideOutput(statsRouter.getTimeseriesOutput())
             .keyBy(e -> e.f0)
             .process(new TimeseriesWriter(outputPath, true))
             // .setParallelism(1)
             .name("timeseries-writer");
+
+        // timeSeriesWriter.union(tilesWriter).process()
         
     }
     
