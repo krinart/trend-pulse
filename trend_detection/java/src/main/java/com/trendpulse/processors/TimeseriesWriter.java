@@ -11,9 +11,16 @@ import java.nio.file.StandardOpenOption;
 public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<CharSequence, String, String>, Void> {
     
     private final String basePath;
+    private final StandardOpenOption openOption;
     
-    public TimeseriesWriter(String basePath) {
+    public TimeseriesWriter(String basePath, boolean append) {
         this.basePath = basePath;
+        if (append) {
+            this.openOption = StandardOpenOption.APPEND;
+        } else {
+            this.openOption = StandardOpenOption.WRITE;
+        }
+
     }
     
     @Override
@@ -32,7 +39,8 @@ public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<
         Files.write(
             Paths.get(fullPath),
             line.getBytes(),
-            StandardOpenOption.APPEND, 
-            StandardOpenOption.CREATE);
+            StandardOpenOption.CREATE,
+            openOption
+        );
     }
 }

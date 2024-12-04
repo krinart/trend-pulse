@@ -2,6 +2,7 @@ package com.trendpulse;
 
 import org.apache.commons.cli.*;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
@@ -200,38 +201,39 @@ public class TrendDetectionJob {
 
     private static void output(DataStream<TrendEvent> trendEvents, String outputPath, TrendStatsRouter statsRouter) {
         SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
-            .keyBy(e -> e.getTopic())
+            .keyBy(e -> e.getTrendId())
             .process(statsRouter)
             // .setParallelism(1)
             .name("stats-router");
             
+        // DataStreamSink<Tuple3<CharSequence, String, String>> tileWriter = routedStream
+        //     .getSideOutput(statsRouter.getTileOutput())
+        //     .keyBy(e -> e.f0)
+        //     .addSink(new CustomFileSink(outputPath, false))
+        //     // .setParallelism(1)
+        //     .name("tile-writer");
+
+        // DataStreamSink<Tuple3<CharSequence, String, String>> timeSeriesWriter = routedStream
+        //     .getSideOutput(statsRouter.getTimeseriesOutput())
+        //     .keyBy(e -> e.f0)
+        //     .addSink(new CustomFileSink(outputPath, true))
+        //     // .setParallelism(1)
+        //     .name("timeseries-writer")
+        // ;
+
         routedStream
             .getSideOutput(statsRouter.getTileOutput())
             .keyBy(e -> e.f0)
-            .addSink(new CustomFileSink(outputPath, false))
+            .process(new TimeseriesWriter(outputPath, false))
             // .setParallelism(1)
             .name("tile-writer");
 
         routedStream
             .getSideOutput(statsRouter.getTimeseriesOutput())
             .keyBy(e -> e.f0)
-            .addSink(new CustomFileSink(outputPath, true))
+            .process(new TimeseriesWriter(outputPath, true))
             // .setParallelism(1)
             .name("timeseries-writer");
-
-        // routedStream
-        //     .getSideOutput(statsRouter.getTileOutput())
-        //     .keyBy(e -> e.f0)
-        //     .process(new TileWriter(outputPath))
-        //     // .setParallelism(1)
-        //     .name("tile-writer");
-
-        // routedStream
-        //     .getSideOutput(statsRouter.getTimeseriesOutput())
-        //     .keyBy(e -> e.f0)
-        //     .process(new TimeseriesWriter(outputPath))
-        //     // .setParallelism(1)
-        //     .name("timeseries-writer");
         
     }
     

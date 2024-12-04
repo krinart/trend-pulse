@@ -64,7 +64,7 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
         timeseriesItem.put("count", windowStats.getCount());
 
         String timeSeriesPath = Paths.get(trendId, "timeseries.json").toString();
-        ctx.output(timeseriesOutput, new Tuple3<>(event.getTopic(), timeSeriesPath, timeseriesItem.toString() + "\n"));
+        ctx.output(timeseriesOutput, new Tuple3<>(event.getTrendId(), timeSeriesPath, timeseriesItem.toString() + "\n"));
         
         List<ZoomStats> geoStats = windowStats.getGeoStats();
         for (ZoomStats zoomStats : geoStats) {
@@ -77,7 +77,7 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
                     trendId, timestamp, zoom, tileX, tileY);
                 String tileData = objectMapper.writeValueAsString(tile.getSampledPoints());
                 
-                ctx.output(tileOutput, new Tuple3<>(event.getTopic(), tilePath, tileData));
+                ctx.output(tileOutput, new Tuple3<>(event.getTrendId(), tilePath, tileData));
             }
         }
     }
