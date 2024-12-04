@@ -4,11 +4,13 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
+import com.trendpulse.schema.TrendEvent;
+
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 
-public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<CharSequence, String, String>, Void> {
+public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<CharSequence, String, String>, TrendEvent> {
     
     private final String basePath;
     private final StandardOpenOption openOption;
@@ -24,7 +26,7 @@ public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<
     }
     
     @Override
-    public void processElement(Tuple3<CharSequence, String, String> value, Context ctx, Collector<Void> out) throws Exception {
+    public void processElement(Tuple3<CharSequence, String, String> value, Context ctx, Collector<TrendEvent> out) throws Exception {
         String filePath = value.f1;
         String line = value.f2;
 

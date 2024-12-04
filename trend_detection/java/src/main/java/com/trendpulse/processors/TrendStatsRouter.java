@@ -63,6 +63,8 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
         timeseriesItem.put("timestamp", timestamp);
         timeseriesItem.put("count", windowStats.getCount());
 
+        trendId = event.getLocationId() + "__" + trendId;
+
         String timeSeriesPath = Paths.get(trendId, "timeseries.json").toString();
         ctx.output(timeseriesOutput, new Tuple3<>(event.getTrendId(), timeSeriesPath, timeseriesItem.toString() + "\n"));
         
