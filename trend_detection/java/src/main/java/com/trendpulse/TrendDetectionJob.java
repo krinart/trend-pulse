@@ -6,14 +6,14 @@ import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
+import org.apache.flink.connector.kafka.source.KafkaSource;
+import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import java.time.Duration;
-import java.time.OffsetDateTime;
-
 import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.connector.file.src.reader.TextLineInputFormat;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -21,11 +21,15 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedWriter;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Properties;
+import java.time.Duration;
+import java.time.OffsetDateTime;
 
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.lib.LocationUtils;
@@ -38,6 +42,9 @@ import com.trendpulse.schema.EventType;
 
 public class TrendDetectionJob {
     
+    static final String TOPIC = "input-messages";
+    static final String COMSUMER_CONFIG_FILE_PATH = "src/main/resources/consumer.config";
+
     // /opt/flink/data/messages_rows.json
     static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows_with_id_v26_500.json";
     static String DEFAULT_SOCKET_PATH = "/tmp/embedding_server.sock";
@@ -137,6 +144,27 @@ public class TrendDetectionJob {
             input = env.fromCollection(lines);
         }   
 
+        Properties properties = new Properties();
+        properties.load(new FileReader(COMSUMER_CONFIG_FILE_PATH));
+
+        // Create the Kafka source
+        KafkaSource<String> kafkaSource = KafkaSource.<String>builder()
+            .setTopics(TOPIC)
+            .setProperties(properties)
+            .setStartingOffsets(OffsetsInitializer.earliest())
+            .setValueOnlyDeserializer(new SimpleStringSchema())
+            .build();
+
+        DataStream<String> stream2 = env.fromSource(kafkaSource, WatermarkStrategy.noWatermarks(), "EventHubs Source");
+        stream2.map(new MapFunction<String, String>() {
+            @Override
+            public String map(String value) throws Exception {
+                return "Received message: " + value;
+            }
+        }).print();
+        env.execute("Trend Detection Job");
+        System.exit(-1);
+        
         DataStream<InputMessage> messages = input
             .map(new MapFunction<String, InputMessage>() {
                 @Override
@@ -239,7 +267,7 @@ public class TrendDetectionJob {
         // timeSeriesWriter.union(tilesWriter).process()
         
     }
-    
+
     static class CustomFileSink extends RichSinkFunction<Tuple3<CharSequence, String, String>> {
 
         private final String basePath;
