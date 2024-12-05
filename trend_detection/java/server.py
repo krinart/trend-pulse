@@ -95,6 +95,8 @@ def process_request(connection):
         connection.sendall(json.dumps(response).encode('utf-8'))
         send_time = time.time() - start_send
 
+        print("Original: " + text[:80], "processed: " + processed_text[:80])
+
         total_time = time.time() - start_total
         # print(f"Timing breakdown: total={total_time:.3f}s (receive={receive_time:.3f}s, process={process_time:.3f}s, model={model_time:.3f}s, send={send_time:.3f}s)")
 

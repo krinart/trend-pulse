@@ -1,22 +1,28 @@
 package com.trendpulse;
 
 import org.apache.commons.cli.*;
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.DataStreamSink;
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
-import org.apache.flink.connector.kafka.source.KafkaSource;
-import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+
+
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.connector.file.src.FileSource;
-import org.apache.flink.core.fs.Path;
-import org.apache.flink.connector.file.src.reader.TextLineInputFormat;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.core.fs.Path;
+import org.apache.flink.connector.file.src.FileSource;
+import org.apache.flink.connector.file.src.reader.TextLineInputFormat;
+import org.apache.flink.connector.kafka.source.KafkaSource;
+import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+import org.apache.flink.formats.json.JsonDeserializationSchema;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
+import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
+import org.apache.flink.util.Collector;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -32,6 +38,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 
 import com.trendpulse.items.InputMessage;
+import com.trendpulse.items.KafkaInputMessage;
 import com.trendpulse.lib.LocationUtils;
 import com.trendpulse.processors.TimeseriesWriter;
 import com.trendpulse.processors.TrendDetectionProcessor;
@@ -121,80 +128,12 @@ public class TrendDetectionJob {
         System.out.println("  Socket path: " + socketPath);
 
 
-        final ObjectMapper mapper = new ObjectMapper();
-        DataStream<String> input;
-
-        if (limit == -1) {
-            FileSource<String> source = FileSource
-                .forRecordStreamFormat(new TextLineInputFormat(), new Path(inputDataPath))
-                .build();
-            
-            input = env.fromSource(
-                    source,
-                    WatermarkStrategy.noWatermarks(),
-                    "JSON-File-Source"
-                );
-        } else {
-            List<String> lines = Files.readAllLines(Paths.get(inputDataPath));
-    
-            if (lines.size() > limit) {
-                lines = lines.subList(0, limit);
-            }
-
-            input = env.fromCollection(lines);
-        }   
-
-        Properties properties = new Properties();
-        properties.load(new FileReader(COMSUMER_CONFIG_FILE_PATH));
-
-        // Create the Kafka source
-        KafkaSource<String> kafkaSource = KafkaSource.<String>builder()
-            .setTopics(TOPIC)
-            .setProperties(properties)
-            .setStartingOffsets(OffsetsInitializer.earliest())
-            .setValueOnlyDeserializer(new SimpleStringSchema())
-            .build();
-
-        DataStream<String> stream2 = env.fromSource(kafkaSource, WatermarkStrategy.noWatermarks(), "EventHubs Source");
-        stream2.map(new MapFunction<String, String>() {
-            @Override
-            public String map(String value) throws Exception {
-                return "Received message: " + value;
-            }
-        }).print();
-        env.execute("Trend Detection Job");
-        System.exit(-1);
-        
-        DataStream<InputMessage> messages = input
-            .map(new MapFunction<String, InputMessage>() {
-                @Override
-                public InputMessage map(String jsonLine) throws Exception {
-                    InputMessage message = mapper.readValue(jsonLine, InputMessage.class);
-
-                    Integer nearestLocationId = LocationUtils.findNearestLocation(
-                        message.getLat(), 
-                        message.getLon()
-                    );
-
-                    message.setDatetime(OffsetDateTime.parse(message.getTimestamp()));
-                    
-                    if (nearestLocationId != null) {
-                        message.setLocationId(nearestLocationId);
-                    }
-
-                    return message;
-
-                }
-            })
-            .name("JSON-Parser")
-            .assignTimestampsAndWatermarks(
-                WatermarkStrategy
-                    .<InputMessage>forBoundedOutOfOrderness(Duration.ofSeconds(5))
-                    .withTimestampAssigner((event, timestamp) -> event.getDatetime().toInstant().toEpochMilli())
-            );
+        DataStream<InputMessage> messagesFromKafka = getKafkaMessages(env);
+        DataStream<InputMessage> messages = getLocalMessages(env, limit, inputDataPath);
 
         // Detect trends
-        DataStream<TrendEvent> trendEvents = messages
+        // DataStream<TrendEvent> trendEvents = messages
+        DataStream<TrendEvent> trendEvents = messagesFromKafka
             .keyBy(new KeySelector<InputMessage, Tuple2<Integer, String>>() {
                 @Override
                 public Tuple2<Integer, String> getKey(InputMessage message) {
@@ -268,6 +207,79 @@ public class TrendDetectionJob {
         
     }
 
+    private static DataStream<InputMessage> getKafkaMessages(StreamExecutionEnvironment env) throws IOException {
+        Properties properties = new Properties();
+        properties.load(new FileReader(COMSUMER_CONFIG_FILE_PATH));
+
+        // Create the Kafka source
+        KafkaSource<InputMessage> kafkaSource = KafkaSource.<InputMessage>builder()
+            .setTopics(TOPIC)
+            .setProperties(properties)
+            .setStartingOffsets(OffsetsInitializer.earliest())
+            .setValueOnlyDeserializer(new InputMessageJsonDeserializer())
+            .build();
+
+        return env
+            .fromSource(
+                kafkaSource,
+                WatermarkStrategy
+                    .<InputMessage>forBoundedOutOfOrderness(Duration.ofSeconds(5))
+                    .withTimestampAssigner((event, timestamp) -> {
+                        return event.getDatetime().toInstant().toEpochMilli();
+                    }),
+                "EventHubs Source"
+            ).setParallelism(2);
+    }
+
+    static class InputMessageJsonDeserializer extends JsonDeserializationSchema<InputMessage> {
+    
+        private transient JsonDeserializationSchema<KafkaInputMessage> kafkaDeserializer;
+
+        public InputMessageJsonDeserializer() {
+            super(InputMessage.class);
+        }
+    
+        @Override
+        public void open(InitializationContext context) {
+            kafkaDeserializer = new JsonDeserializationSchema<KafkaInputMessage>(KafkaInputMessage.class);
+            kafkaDeserializer.open(context);
+        }
+
+        @Override
+        public InputMessage deserialize(byte[] message) throws IOException {
+            if (kafkaDeserializer == null) {
+                throw new IOException("Received null kafkaDeserializer");
+            }
+            KafkaInputMessage kafkaMessage = kafkaDeserializer.deserialize(message);
+            return convertToInputMessage(kafkaMessage);
+        }
+        
+        private static InputMessage convertToInputMessage(KafkaInputMessage kafkaMessage) {
+            InputMessage inputMessage = new InputMessage();
+            
+            inputMessage.setTopic(kafkaMessage.getTopic());
+            inputMessage.setTimestamp(kafkaMessage.getTimestamp());
+            inputMessage.setLon(kafkaMessage.getLon());
+            inputMessage.setLat(kafkaMessage.getLat());
+            inputMessage.setText(kafkaMessage.getText());
+            inputMessage.setDTrendId(kafkaMessage.getD_trend_id());
+            inputMessage.setDLocationId(kafkaMessage.getD_location_id());
+            
+            inputMessage.setDatetime(OffsetDateTime.parse(kafkaMessage.getTimestamp()));
+            // System.out.println(inputMessage.getDatetime().toInstant().toString());
+            
+            Integer nearestLocationId = LocationUtils.findNearestLocation(
+                kafkaMessage.getLat(), 
+                kafkaMessage.getLon()
+            );
+            if (nearestLocationId != null) {
+                inputMessage.setLocationId(nearestLocationId);
+            }
+            
+            return inputMessage;
+        }
+    }
+
     static class CustomFileSink extends RichSinkFunction<Tuple3<CharSequence, String, String>> {
 
         private final String basePath;
@@ -294,6 +306,59 @@ public class TrendDetectionJob {
                 writer.write(content);
             }
         }
+    }
+
+    private static DataStream<InputMessage> getLocalMessages(StreamExecutionEnvironment env, int limit, String inputDataPath) throws IOException {
+        final ObjectMapper mapper = new ObjectMapper();
+        DataStream<String> input;
+
+        if (limit == -1) {
+            FileSource<String> source = FileSource
+                .forRecordStreamFormat(new TextLineInputFormat(), new Path(inputDataPath))
+                .build();
+            
+            input = env.fromSource(
+                    source,
+                    WatermarkStrategy.noWatermarks(),
+                    "JSON-File-Source"
+                );
+        } else {
+            List<String> lines = Files.readAllLines(Paths.get(inputDataPath));
+    
+            if (lines.size() > limit) {
+                lines = lines.subList(0, limit);
+            }
+
+            input = env.fromCollection(lines);
+        }   
+
+        return input
+            .map(new MapFunction<String, InputMessage>() {
+                @Override
+                public InputMessage map(String jsonLine) throws Exception {
+                    InputMessage message = mapper.readValue(jsonLine, InputMessage.class);
+
+                    Integer nearestLocationId = LocationUtils.findNearestLocation(
+                        message.getLat(), 
+                        message.getLon()
+                    );
+
+                    message.setDatetime(OffsetDateTime.parse(message.getTimestamp()));
+                    
+                    if (nearestLocationId != null) {
+                        message.setLocationId(nearestLocationId);
+                    }
+
+                    return message;
+
+                }
+            })
+            .name("JSON-Parser")
+            .assignTimestampsAndWatermarks(
+                WatermarkStrategy
+                    .<InputMessage>forBoundedOutOfOrderness(Duration.ofSeconds(5))
+                    .withTimestampAssigner((event, timestamp) -> event.getDatetime().toInstant().toEpochMilli())
+            );
     }
 
 }
