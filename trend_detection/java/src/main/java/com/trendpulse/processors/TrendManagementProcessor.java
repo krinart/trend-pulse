@@ -33,10 +33,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
     private static final double SIMILARITY_THRESHOLD = 0.8; // Cosine similarity threshold
     private static String AZURE_OPENAI_ENDPOINT = "https://my-first-open-ai-service.openai.azure.com/";
     private static String AZURE_OPENAI_KEY = "uClNQwvESsEPxSFhKKonjSfIa8KDKUsyzLo7wl0rHzSpTI2qd40fJQQJ99AKACYeBjFXJ3w3AAABACOGgkTy";
-    private static final OpenAIClient client = new OpenAIClientBuilder()
-        .endpoint(AZURE_OPENAI_ENDPOINT)
-        .credential(new AzureKeyCredential(AZURE_OPENAI_KEY))
-        .buildClient();
+    private transient OpenAIClient client;
 
     private final Map<String, LocalTrend> localTrends = new HashMap<>();
     private final Map<String, GlobalTrend> globalTrends = new HashMap<>();
@@ -56,6 +53,11 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         this.scheduledWindows = getRuntimeContext().getListState(
             new ListStateDescriptor<>("scheduled_windows", Long.class)
         );
+
+        client = new OpenAIClientBuilder()
+            .endpoint(AZURE_OPENAI_ENDPOINT)
+            .credential(new AzureKeyCredential(AZURE_OPENAI_KEY))
+            .buildClient();
     }
 
     @Override

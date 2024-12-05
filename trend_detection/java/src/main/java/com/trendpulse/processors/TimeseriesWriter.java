@@ -22,7 +22,6 @@ public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<
         } else {
             this.openOption = StandardOpenOption.WRITE;
         }
-
     }
     
     @Override

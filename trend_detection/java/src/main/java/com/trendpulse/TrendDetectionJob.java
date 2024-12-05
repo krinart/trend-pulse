@@ -5,7 +5,6 @@ import org.apache.commons.cli.*;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -19,10 +18,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
-import org.apache.flink.util.Collector;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -30,6 +26,7 @@ import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -40,17 +37,18 @@ import java.time.OffsetDateTime;
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.items.KafkaInputMessage;
 import com.trendpulse.lib.LocationUtils;
-import com.trendpulse.processors.TimeseriesWriter;
 import com.trendpulse.processors.TrendDetectionProcessor;
 import com.trendpulse.processors.TrendStatsRouter;
+import com.trendpulse.processors.TrendWriter;
 import com.trendpulse.processors.TrendManagementProcessor;
 import com.trendpulse.schema.TrendEvent;
 import com.trendpulse.schema.EventType;
+import com.trendpulse.schema.TrendDataWrittenEvent;
 
 public class TrendDetectionJob {
     
     static final String TOPIC = "input-messages";
-    static final String COMSUMER_CONFIG_FILE_PATH = "src/main/resources/consumer.config";
+    static final String CONSUMER_CONFIG_FILE_PATH = "consumer.config";
 
     // /opt/flink/data/messages_rows.json
     static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows_with_id_v26_500.json";
@@ -141,12 +139,13 @@ public class TrendDetectionJob {
                 }
             })
             .process(new TrendDetectionProcessor(socketPath, trendStatsWindowMinutes))
-            .name("trend-detection");
+            .name("Trend Detection");
 
         // Apply TrendManagementProcessor
         DataStream<TrendEvent> globalTrendEvents = trendEvents
             .keyBy(e -> e.getTopic())
             .process(new TrendManagementProcessor(trendStatsWindowMinutes))
+            .name("Trend Management")
             // .setParallelism(1)
         ;
 
@@ -161,6 +160,7 @@ public class TrendDetectionJob {
             .map(event -> String.format(
                 "%s(%s, %s): %s", 
                 event.getEventType(), event.getTrendId(), event.getLocationId(), ""))
+            .name("TREND_DEACTIVATED print ")
             .print();       
 
         // Execute
@@ -168,7 +168,7 @@ public class TrendDetectionJob {
     }
 
     private static void output(DataStream<TrendEvent> trendEvents, String outputPath, TrendStatsRouter statsRouter) {
-        SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
+        SingleOutputStreamOperator<Void> routedStream = trendEvents
             .keyBy(e -> e.getTrendId())
             .process(statsRouter)
             // .setParallelism(1)
@@ -189,17 +189,19 @@ public class TrendDetectionJob {
         //     .name("timeseries-writer")
         // ;
 
-        DataStream<TrendEvent> timeSeriesWriter = routedStream
+        String connectionString = "DefaultEndpointsProtocol=https;AccountName=trenddetection5811932626;AccountKey=Ihxo1OGV+3QBBdPVrfUnc3Zy9gRTJXzqmXyQQOhq6KWrwer8rS9g0ZfuZtlqxR4YiOEgDZToiIdJ+AStAJXqpw==;EndpointSuffix=core.windows.net";
+
+        DataStream<TrendDataWrittenEvent> timeSeriesWriter = routedStream
             .getSideOutput(statsRouter.getTileOutput())
-            .keyBy(e -> e.f0)
-            .process(new TimeseriesWriter(outputPath, false))
+            .keyBy(e -> e.getTrendId())
+            .process(new TrendWriter(connectionString, "trend-pulse", ""))
             // .setParallelism(1)
             .name("tile-writer");
 
-        DataStream<TrendEvent> tilesWriter = routedStream
+        DataStream<TrendDataWrittenEvent> tilesWriter = routedStream
             .getSideOutput(statsRouter.getTimeseriesOutput())
-            .keyBy(e -> e.f0)
-            .process(new TimeseriesWriter(outputPath, true))
+            .keyBy(e -> e.getTrendId())
+            .process(new TrendWriter(connectionString, "trend-pulse", ""))
             // .setParallelism(1)
             .name("timeseries-writer");
 
@@ -207,14 +209,24 @@ public class TrendDetectionJob {
         
     }
 
-    private static DataStream<InputMessage> getKafkaMessages(StreamExecutionEnvironment env) throws IOException {
+    private static Properties loadKafkaProperties() throws IOException {
         Properties properties = new Properties();
-        properties.load(new FileReader(COMSUMER_CONFIG_FILE_PATH));
 
-        // Create the Kafka source
+        // Use getResourceAsStream instead of FileReader
+        try (InputStream input = TrendDetectionJob.class.getClassLoader().getResourceAsStream(CONSUMER_CONFIG_FILE_PATH)) {
+            if (input == null) {
+                throw new IOException("Unable to find consumer.config on classpath");
+            }
+            properties.load(input);
+        }
+
+        return properties;
+    }
+
+    private static DataStream<InputMessage> getKafkaMessages(StreamExecutionEnvironment env) throws IOException {
         KafkaSource<InputMessage> kafkaSource = KafkaSource.<InputMessage>builder()
             .setTopics(TOPIC)
-            .setProperties(properties)
+            .setProperties(loadKafkaProperties())
             .setStartingOffsets(OffsetsInitializer.earliest())
             .setValueOnlyDeserializer(new InputMessageJsonDeserializer())
             .build();

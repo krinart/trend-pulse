@@ -8,8 +8,7 @@
       "symbols": [
         "TREND_ACTIVATED",
         "TREND_STATS",
-        "TREND_DEACTIVATED",
-        "TREND_DATA_WRITTEN"
+        "TREND_DEACTIVATED"
       ]
     },
     {
@@ -82,6 +81,34 @@
             "TrendStatsInfo"
           ]
         }
+      ]
+    },
+    {
+      "type": "enum",
+      "name": "TrendDataType",
+      "symbols": [
+        "DATA_TYPE_TIMESERIES",
+        "DATA_TYPE_GEO"
+      ]
+    },
+    {
+      "type": "record",
+      "name": "TrendDataEvent",
+      "fields": [
+        {"name": "trendId", "type": "string"},
+        {"name": "timestamp", "type": "long"},
+        {"name": "path", "type": "string"},
+        {"name": "data", "type": "string"},
+        {"name": "dataType", "type": "TrendDataType"}
+      ]
+    },
+    {
+      "type": "record",
+      "name": "TrendDataWrittenEvent",
+      "fields": [
+        {"name": "trendId", "type": "string"},
+        {"name": "timestamp", "type": "long"},
+        {"name": "dataType", "type": "TrendDataType"}
       ]
     }
   ]

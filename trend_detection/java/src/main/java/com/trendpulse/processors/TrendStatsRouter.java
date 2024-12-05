@@ -9,44 +9,50 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
 
-import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.trendpulse.schema.TrendEvent;
 import com.trendpulse.schema.TrendStatsInfo;
 import com.trendpulse.schema.WindowStats;
+import com.trendpulse.TrendDetectionJob;
 import com.trendpulse.schema.EventType;
 import com.trendpulse.schema.Point;
 import com.trendpulse.schema.TileStats;
+import com.trendpulse.schema.TrendDataEvent;
+import com.trendpulse.schema.TrendDataType;
 import com.trendpulse.schema.ZoomStats;
 
 
-public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEvent, TrendEvent> {
+public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEvent, Void> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TrendDetectionJob.class);
 
     private static final ObjectMapper objectMapper = new ObjectMapper()
         .registerModule(new AvroModule())
         .addMixIn(Point.class, IgnoreSchemaPropertyConfig.class);
     
-    private final OutputTag<Tuple3<CharSequence, String, String>> timeseriesOutput;
-    private final OutputTag<Tuple3<CharSequence, String, String>> tileOutput;
+    private final OutputTag<TrendDataEvent> timeseriesOutput;
+    private final OutputTag<TrendDataEvent> tileOutput;
     
     public TrendStatsRouter() {
         this.timeseriesOutput = new OutputTag<>("timeseries") {};
         this.tileOutput = new OutputTag<>("tiles") {};
     }
 
-    public OutputTag<Tuple3<CharSequence, String, String>> getTimeseriesOutput() {
+    public OutputTag<TrendDataEvent> getTimeseriesOutput() {
         return this.timeseriesOutput;
     }
 
-    public OutputTag<Tuple3<CharSequence, String, String>> getTileOutput() {
+    public OutputTag<TrendDataEvent> getTileOutput() {
         return this.tileOutput;
     }
     
     @Override
-    public void processElement(TrendEvent event, Context ctx, Collector<TrendEvent> out) throws Exception {
+    public void processElement(TrendEvent event, Context ctx, Collector<Void> out) throws Exception {
         
         if (event.getEventType() != EventType.TREND_STATS) {
             return;
@@ -57,6 +63,8 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
         WindowStats windowStats = eventInfo.getStats();
         String timestamp = Instant.ofEpochSecond(windowStats.getWindowStart()).toString();
         
+        // LOG.info("Routing trend: {}", event.getTrendId());
+
         // System.out.println("Routed - trend: " + trendId + " | timestamp: " + timestamp );
 
         ObjectNode timeseriesItem = objectMapper.createObjectNode();
@@ -66,8 +74,18 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
         trendId = event.getLocationId() + "__" + trendId;
 
         String timeSeriesPath = Paths.get(trendId, "timeseries.json").toString();
-        ctx.output(timeseriesOutput, new Tuple3<>(event.getTrendId(), timeSeriesPath, timeseriesItem.toString() + "\n"));
-        
+        // LOG.info("TrendStatsRouter: {}", timeSeriesPath);
+        TrendDataEvent timeseriesDataEvent = new TrendDataEvent(
+            event.getTrendId(), 
+            windowStats.getWindowStart(), 
+            timeSeriesPath,
+            timeseriesItem.toString() + "\n",
+            TrendDataType.DATA_TYPE_TIMESERIES
+        );
+
+        // ctx.output(timeseriesOutput, new Tuple3<>(event.getTrendId(), timeSeriesPath, timeseriesItem.toString() + "\n"));
+        ctx.output(timeseriesOutput, timeseriesDataEvent);
+
         List<ZoomStats> geoStats = windowStats.getGeoStats();
         for (ZoomStats zoomStats : geoStats) {
             int zoom = zoomStats.getZoom();
@@ -79,7 +97,16 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
                     trendId, timestamp, zoom, tileX, tileY);
                 String tileData = objectMapper.writeValueAsString(tile.getSampledPoints());
                 
-                ctx.output(tileOutput, new Tuple3<>(event.getTrendId(), tilePath, tileData));
+                // LOG.info("TrendStatsRouter: {}", tilePath);
+                TrendDataEvent geoDataEvent = new TrendDataEvent(
+                    event.getTrendId(), 
+                    windowStats.getWindowStart(), 
+                    tilePath,
+                    tileData,
+                    TrendDataType.DATA_TYPE_GEO
+                );
+                
+                ctx.output(tileOutput, geoDataEvent);
             }
         }
     }
