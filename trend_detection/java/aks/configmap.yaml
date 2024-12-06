@@ -19,11 +19,13 @@ data:
     jobmanager.bind-host: 0.0.0.0
     taskmanager.bind-host: 0.0.0.0
     blob.server.bind-host: 0.0.0.0
+    rest.bind-address: 0.0.0.0  
     
     # Set explicit ports
     jobmanager.rpc.port: 6123
     blob.server.port: 6124
     taskmanager.rpc.port: 6122
+    rest.bind-port: 8081
     
     # Extended timeouts
     blob.client.connect.timeout: 120000
