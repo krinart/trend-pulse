@@ -22,6 +22,8 @@ import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -125,7 +127,7 @@ public class TrendDetectionJob {
 
 
         DataStream<InputMessage> messagesFromKafka = getKafkaMessages(env);
-        DataStream<InputMessage> messages = getLocalMessages(env, limit, inputDataPath);
+        // DataStream<InputMessage> messages = getLocalMessages(env, limit, inputDataPath);
 
         // Detect trends
         // DataStream<TrendEvent> trendEvents = messages
@@ -209,6 +211,15 @@ public class TrendDetectionJob {
 
     private static Properties loadKafkaProperties() throws IOException {
         Properties properties = new Properties();
+
+        File configFile = new File("/opt/flink/conf/eventhubs/consumer.config");
+        if (configFile.exists()) {
+            try (FileInputStream input = new FileInputStream(configFile)) {
+                properties.load(input);
+                System.out.println("Loaded config from mounted file: " + configFile.getAbsolutePath());
+                return properties;
+            }
+        }
 
         // Use getResourceAsStream instead of FileReader
         try (InputStream input = TrendDetectionJob.class.getClassLoader().getResourceAsStream(CONSUMER_CONFIG_FILE_PATH)) {

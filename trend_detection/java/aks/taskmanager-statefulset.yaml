@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: flink-taskmanager
+spec:
+  serviceName: "flink-taskmanager"
+  replicas: 2  # This controls the number of taskmanager-embedding server pairs
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: flink
+      component: taskmanager
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: taskmanager
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - flink
+              - key: component
+                operator: In
+                values:
+                - taskmanager
+            topologyKey: "kubernetes.io/hostname"
+      volumes:
+      - name: flink-config-volume
+        configMap:
+          name: flink-config
+          items:
+          - key: flink-conf.yaml
+            path: flink-conf.yaml
+          - key: log4j-console.properties
+            path: log4j-console.properties
+      - name: job-artifacts
+        persistentVolumeClaim:
+          claimName: flink-job-artifacts
+      - name: embedding-socket
+        emptyDir: {}
+      - name: flink-logs
+        emptyDir: {}
+      - name: eventhubs-config
+        configMap:
+          name: eventhubs-config
+      initContainers:
+      - name: socket-setup
+        image: busybox
+        command: ["sh", "-c", "mkdir -p /tmp/sockets && chmod 777 /tmp/sockets"]
+        volumeMounts:
+        - name: embedding-socket
+          mountPath: /tmp/sockets
+      containers:
+      - name: taskmanager
+        image: flink:1.18.0-java11
+        args: ["taskmanager"]
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 10"]  # Grace period for cleanup
+        volumeMounts:
+        - name: flink-config-volume
+          mountPath: /opt/flink/conf
+        - name: job-artifacts
+          mountPath: /opt/flink/usrlib
+        - name: embedding-socket
+          mountPath: /tmp
+        - name: flink-logs
+          mountPath: /opt/flink/log
+        - name: eventhubs-config
+          mountPath: /opt/flink/conf/eventhubs
+        env:
+        - name: SOCKET_PATH
+          value: "/tmp/embedding_server.sock"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      - name: embedding-server
+        image: krinart.azurecr.io/embedding-server:latest
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 5"]  # Ensure graceful shutdown
+        volumeMounts:
+        - name: embedding-socket
+          mountPath: /tmp
+        env:
+        - name: SOCKET_PATH
+          value: "/tmp/embedding_server.sock"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          limits:
+            cpu: "4"
+            memory: "2Gi"
+          requests:
+            cpu: "1"
+            memory: "1Gi"

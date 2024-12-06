@@ -1,0 +1,47 @@
+# Run from ..
+
+az aks get-credentials -g krinart-rg -n trend-detection
+
+kubectl create namespace flink
+kubectl config set-context --current --namespace=flink
+
+az acr login -n krinart
+az aks update -n trend-detection -g krinart-rg --attach-acr krinart
+
+docker build -t krinart.azurecr.io/embedding-server:latest -f Dockerfile.python .
+docker push krinart.azurecr.io/embedding-server:latest
+
+kubectl create configmap eventhubs-config --from-file=src/main/resources/consumer.config -n flink
+
+kubectl delete configmap flink-config -n flink
+kubectl delete deployment flink-jobmanager -n flink
+kubectl delete statefulset flink-taskmanager -n flink
+
+kubectl apply -f aks/configmap.yaml
+kubectl apply -f aks/storage.yaml
+kubectl apply -f aks/jobmanager.yaml
+kubectl apply -f aks/taskmanager-statefulset.yaml
+
+# Copy JAR to the job-artifacts PVC
+kubectl cp ./target/trend-detection-1.0-SNAPSHOT.jar flink/$(kubectl get pod -l component=jobmanager -o jsonpath='{.items[0].metadata.name}'):/opt/flink/usrlib/
+
+# Submit the job
+kubectl exec -it $(kubectl get pod -l component=jobmanager -o jsonpath='{.items[0].metadata.name}') -- ./bin/flink run -d /opt/flink/usrlib/trend-detection-1.0-SNAPSHOT.jar
+
+# Other
+kubectl get pods
+kubectl describe pod <pod_name>
+kubectl delete deployment flink-jobmanager -n flink
+kubectl delete statefulset flink-taskmanager -n flink
+
+kubectl exec -it $(kubectl get pod -l component=jobmanager -o jsonpath='{.items[0].metadata.name}') -- ls -l /opt/flink/conf
+
+kubectl get svc flink-jobmanager
+
+kubectl logs -f flink-jobmanager-68b7bf9649-vhgjd -c jobmanager
+kubectl logs -f flink-taskmanager-0 -c taskmanager
+kubectl logs -f flink-taskmanager-0 -c embedding-server
+
+
+kubectl exec -it $(kubectl get pod -l component=jobmanager -o jsonpath='{.items[0].metadata.name}') -- flink list
+kubectl exec -it $(kubectl get pod -l component=jobmanager -o jsonpath='{.items[0].metadata.name}') -- flink cancel <job_id>

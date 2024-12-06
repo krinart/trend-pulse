@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-jobmanager
+  namespace: flink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink
+      component: jobmanager
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: jobmanager
+    spec:
+      volumes:
+      - name: flink-config-volume
+        configMap:
+          name: flink-config
+      - name: job-artifacts
+        persistentVolumeClaim:
+          claimName: flink-job-artifacts
+      - name: eventhubs-config
+        configMap:
+          name: eventhubs-config
+      containers:
+      - name: jobmanager
+        image: flink:1.18.0-java11
+        args: ["jobmanager"]
+        ports:
+        - containerPort: 6123
+          name: rpc
+        - containerPort: 6124
+          name: blob
+        - containerPort: 8081
+          name: ui
+        volumeMounts:
+        - name: flink-config-volume
+          mountPath: /opt/flink/conf
+        - name: job-artifacts
+          mountPath: /opt/flink/usrlib
+        - name: eventhubs-config
+          mountPath: /opt/flink/conf/eventhubs
+        env:
+        - name: JOB_MANAGER_RPC_ADDRESS
+          value: flink-jobmanager
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-jobmanager
+spec:
+  type: LoadBalancer
+  ports:
+  - name: rpc
+    port: 6123
+  - name: blob
+    port: 6124
+  - name: ui
+    port: 8081
+  selector:
+    app: flink
+    component: jobmanager
