@@ -74,9 +74,9 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         String topic = ctx.getCurrentKey().f1;
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
-        // if (locationId != 3) {
-        //     return;
-        // }
+        if (locationId != 3) {
+            return;
+        }
 
         if (message.getDTrendId() != 1) {
             return;

@@ -4,13 +4,15 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
+import com.trendpulse.schema.TrendDataEvent;
+import com.trendpulse.schema.TrendDataWrittenEvent;
 import com.trendpulse.schema.TrendEvent;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 
-public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<CharSequence, String, String>, TrendEvent> {
+public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, TrendDataEvent, TrendDataWrittenEvent> {
     
     private final String basePath;
     private final StandardOpenOption openOption;
@@ -25,11 +27,11 @@ public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<
     }
     
     @Override
-    public void processElement(Tuple3<CharSequence, String, String> value, Context ctx, Collector<TrendEvent> out) throws Exception {
-        String filePath = value.f1;
-        String line = value.f2;
-
+    public void processElement(TrendDataEvent event, Context ctx, Collector<TrendDataWrittenEvent> out) throws Exception {
+        String filePath = event.getPath().toString();
         String fullPath = Paths.get(basePath, filePath).toString();
+        
+        String line = event.getData().toString();
 
         // Create directories if they don't exist
         Files.createDirectories(Paths.get(fullPath).getParent());
@@ -43,5 +45,11 @@ public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, Tuple3<
             StandardOpenOption.CREATE,
             openOption
         );
+
+        out.collect(new TrendDataWrittenEvent(
+            event.getTrendId(),
+            event.getTimestamp(),
+            event.getDataType()
+        ));
     }
 }

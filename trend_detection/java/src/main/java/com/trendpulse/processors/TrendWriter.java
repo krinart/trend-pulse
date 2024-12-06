@@ -62,7 +62,7 @@ public class TrendWriter extends KeyedProcessFunction<CharSequence, TrendDataEve
         String filePath = event.getPath().toString();
         String fullPath = Paths.get(basePath, filePath).toString();
 
-        System.out.println("TrendWriter.processElement: " + fullPath);
+        // System.out.println("TrendWriter.processElement: " + fullPath);
         LOG.info("TrendWriter.processElement: {}", fullPath);
 
         BlobContainerClient containerClient = blobServiceClient.getBlobContainerClient(containerName);
