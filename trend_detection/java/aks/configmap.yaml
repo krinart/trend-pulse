@@ -11,7 +11,7 @@ data:
     jobmanager.memory.heap.size: 1024m
     taskmanager.numberOfTaskSlots: 2
     taskmanager.memory.process.size: 2048m
-    parallelism.default: 2
+    parallelism.default: 4
     kubernetes.container.image: flink:1.18.0-java11
     kubernetes.namespace: flink
     
