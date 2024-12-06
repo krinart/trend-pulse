@@ -8,6 +8,8 @@ import com.trendpulse.lib.TrendStatsGrid;
 
 public class TrendDetected implements Serializable {
     private String id;
+    private Integer locationID;
+    private String topic;
     private List<String> keywords;
     private long createdAt;
     private long lastUpdate;
@@ -21,9 +23,11 @@ public class TrendDetected implements Serializable {
     private Map<Integer, Integer> debugLocationsMap;
     private Map<Integer, Integer> debugTrendsMap;
 
-    public TrendDetected(String id, List<String> keywords, List<Message> messages, 
+    public TrendDetected(String id, Integer locationID, String topic, List<String> keywords, List<Message> messages, 
                 double[] centroid, long currentTime, int statsWindowMinutes) {
         this.id = id;
+        this.locationID = locationID;
+        this.topic = topic;
         this.keywords = keywords;
         this.messages = new HashSet<>(messages);
         this.centroid = centroid;
@@ -45,6 +49,8 @@ public class TrendDetected implements Serializable {
 
     // Getters
     public String getId() { return id; }
+    public Integer getLocationId() { return locationID; }
+    public String getTopic() { return topic; }
     public List<String> getKeywords() { return keywords; }
     public double[] getCentroid() { return centroid; }
     public long getLastUpdate() { return lastUpdate; }

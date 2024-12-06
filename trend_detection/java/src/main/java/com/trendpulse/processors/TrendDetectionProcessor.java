@@ -33,7 +33,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
 
     private final String socketPath;
     private final int trendStatsWindowMinutes;
-    private transient Map<Integer, TrendDetector> trendDetectorsMap;
+    private transient Map<Tuple2<Integer, String>, TrendDetector> trendDetectorsMap;
     private transient ListState<Long> scheduledWindows;
 
     public TrendDetectionProcessor(String socketPath, int trendStatsWindowMinutes) {
@@ -77,7 +77,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         String topic = ctx.getCurrentKey().f1;
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
-        // if (locationId != 3) {
+        // if (locationId != 16) {
         //     return;
         // }
 
@@ -85,37 +85,24 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         //     return;
         // }
 
-        if (!trendDetectorsMap.containsKey(locationId)) {
-            trendDetectorsMap.put(locationId, new TrendDetector(locationId, topic, socketPath, trendStatsWindowMinutes));
+        if (!trendDetectorsMap.containsKey(ctx.getCurrentKey())) {
+            trendDetectorsMap.put(ctx.getCurrentKey(), new TrendDetector(locationId, topic, socketPath, trendStatsWindowMinutes));
         }
 
-        TrendDetector trendDetector = this.trendDetectorsMap.get(locationId);
+        TrendDetector trendDetector = this.trendDetectorsMap.get(ctx.getCurrentKey());
         TrendDetector.ProcessingResult result = trendDetector.processMessage(message, ctx.timestamp());
         
         String events = "";
 
         if (result != null ) {
             for (TrendDetected trend : result.getActivatedTrends()) {
-                // Map<String, Object> eventInfo = new HashMap<>();
-                // eventInfo.put("keywords", trend.getKeywords());
-                // eventInfo.put("centroid", trend.getCentroid());
-                // eventInfo.put(
-                //     "sampleMessages", 
-                //     trend.getMessages().stream().limit(10).map(m -> m.getText()).collect(Collectors.toList()));
-
-                
-                // Map<String, Object> debug = new HashMap<>();
-                // debug.put("location_ids", trend.getDLocationIds());
-                // debug.put("trend_ids", trend.getDebugTrendIds());
-                // eventInfo.put("debug", debug);
-
                 events += " TREND_ACTIVATED ";
 
                 TrendEvent event = new TrendEvent(
                     EventType.TREND_ACTIVATED,
                     trend.getId(),
-                    locationId,
-                    topic,
+                    trend.getLocationId(),
+                    trend.getTopic(),
                     new TrendActivatedInfo(
                         new ArrayList<>(trend.getKeywords()),
                         Arrays.asList(ArrayUtils.toObject(trend.getCentroid())),
@@ -130,31 +117,30 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         for (TrendDetected trend : result.getDeActivatedTrends()) {
             
             events += " TREND_DEACTIVATED ";
-
             TrendEvent event = new TrendEvent(
                 EventType.TREND_DEACTIVATED,
                 trend.getId(),
-                locationId,
-                topic,
+                trend.getLocationId(),
+                trend.getTopic(),
                 null
             );
             
             out.collect(event);
         }
 
-        // Files.write(
-        //     Paths.get("local_messages_5_min.csv"),
-        //     // Paths.get("kafka_messages_15_min.csv"),
-        //     String.format(
-        //         "%d, %d, %d, %s\n", 
-        //         ctx.timestamp(), 
-        //         ctx.timerService().currentWatermark(), 
-        //         ctx.timestamp() - ctx.timerService().currentWatermark(),
-        //         events
-        //     ).getBytes(),
-        //     StandardOpenOption.CREATE,
-        //     StandardOpenOption.APPEND
-        // );
+        Files.write(
+            // Paths.get("local_messages_5_min.csv"),
+            Paths.get("kafka_messages_4_partitions.csv"),
+            String.format(
+                "%d, %d, %d, %s\n", 
+                ctx.timestamp(), 
+                ctx.timerService().currentWatermark(), 
+                (ctx.timestamp() - ctx.timerService().currentWatermark()) / 1000 / 60,
+                events
+            ).getBytes(),
+            StandardOpenOption.CREATE,
+            StandardOpenOption.APPEND
+        );
     }
 
     @Override
@@ -173,12 +159,10 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
             }
         });
 
-        Integer locationId = ctx.getCurrentKey().f0;
-        String topic = ctx.getCurrentKey().f1;
         Instant windowEnd = Instant.ofEpochMilli(timestamp);
         Instant windowStart = windowEnd.minus(trendStatsWindowMinutes, ChronoUnit.MINUTES);
 
-        TrendDetector trendDetector = trendDetectorsMap.get(locationId);
+        TrendDetector trendDetector = trendDetectorsMap.get(ctx.getCurrentKey());
         
         if (trendDetector != null) {
             for (TrendDetected trend : trendDetector.getTrends()) {
@@ -188,21 +172,11 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
                     continue;
                 }
 
-                // Map<String, Object> eventInfo = new HashMap<>();
-                // eventInfo.put("window_start", windowStart.toString());
-                // eventInfo.put("window_end", windowEnd.toString());
-                // eventInfo.put("window_stats", trend.getStats().getWindowStats(windowStart));
-
-                // Map<String, Object> debug = new HashMap<>();
-                // debug.put("location_ids", trend.getDebugLocationIds());
-                // debug.put("trend_ids", trend.getDebugTrendIds());
-                // eventInfo.put("debug", debug);
-
                 TrendEvent event = new TrendEvent(
                     EventType.TREND_STATS,
                     trend.getId(),
-                    locationId,
-                    topic,
+                    trend.getLocationId(),
+                    trend.getTopic(),
                     new TrendStatsInfo(trend.getStats().getWindowStats(windowStart))
                 );
 

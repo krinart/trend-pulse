@@ -86,7 +86,8 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         // Initialize new local trend
         LocalTrend newTrend = initializeLocalTrend(eventInfo, topic, trendId, event.getLocationId());
         // System.out.println("----------------------------------------");
-        System.out.println("Incoming trend: " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
+        // System.out.println(Thread.currentThread().getName() + " - " + ctx.getCurrentKey() +  " - Incoming trend(" + newTrend.getId() + "): " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
+        System.out.println("Incoming trend(" + newTrend.getId() + "): " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
         
         // First check global trends
         List<TrendWithSimilarity> similarGlobalTrends = findSimilarTrends(
@@ -155,7 +156,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             return;
         }
 
-        System.out.println("Unknown trend id: " + trendId);
+        System.out.println(Thread.currentThread().getName() + " - " + ctx.getCurrentKey() +  " - Unknown trend id: " + trendId);
     }
 
     private void processTrendDeactivated(TrendEvent event, Context ctx, Collector<TrendEvent> out) {

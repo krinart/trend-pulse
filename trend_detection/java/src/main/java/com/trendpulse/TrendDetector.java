@@ -125,7 +125,7 @@ public class TrendDetector {
                 // Set<Message>s = new HashSet<Message>(clusteredMessages);
                 // s.retainAll(trend.getMessages());
                 // System.out.println(this.locationID + " Remove trend with " + trend.getMessages().size() + " messages | clustered: " + s.size());
-                System.out.println("Remove trend:  " + trend.getId() + " - " + (cutoffTime - trend.getLastUpdate()));
+                System.out.println("Remove trend:  " + trend.getId() + " - " + (currentTime - trend.getLastUpdate())/1000 / 60 + "min");
                 clusteredMessages.removeAll(trend.getMessages());
                 unmatchedMessages.removeAll(trend.getMessages());
                 deActivatedTrends.add(trend);
@@ -307,6 +307,8 @@ public class TrendDetector {
                 String trendId = "trend_" + currentTime + "_" + String.join("_", keywords);
                 TrendDetected newTrend = new TrendDetected(
                     trendId, 
+                    locationID,
+                    topic,
                     keywords, 
                     clusterMessages, 
                     centroid, 
