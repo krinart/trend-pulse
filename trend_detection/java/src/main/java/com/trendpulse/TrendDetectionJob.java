@@ -62,8 +62,9 @@ public class TrendDetectionJob {
         
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         // env.setParallelism(1);
+        env.getConfig().setAutoWatermarkInterval(50);
 
-        DataStream<InputMessage> messagesFromKafka = getKafkaMessages(env);
+        // DataStream<InputMessage> messagesFromKafka = getKafkaMessages(env);
 
         // Detect trends
         DataStream<TrendEvent> trendEvents = getKafkaMessages(env)
@@ -112,15 +113,15 @@ public class TrendDetectionJob {
         DataStream<TrendDataWrittenEvent> timeSeriesWriter = routedStream
             .getSideOutput(statsRouter.getTileOutput())
             .keyBy(e -> e.getTrendId())
-            // .process(new TrendWriter(connectionString, "trend-pulse", ""))
-            .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, false))
+            .process(new TrendWriter(connectionString, "trend-pulse", ""))
+            // .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, false))
             .name("tile-writer");
 
         DataStream<TrendDataWrittenEvent> tilesWriter = routedStream
             .getSideOutput(statsRouter.getTimeseriesOutput())
             .keyBy(e -> e.getTrendId())
-            // .process(new TrendWriter(connectionString, "trend-pulse", ""))
-            .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, true))
+            .process(new TrendWriter(connectionString, "trend-pulse", ""))
+            // .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, true))
             .name("timeseries-writer");
 
         return timeSeriesWriter.union(tilesWriter);
@@ -167,16 +168,17 @@ public class TrendDetectionJob {
 
     private static WatermarkStrategy<InputMessage> createWatermarkStrategy() {
         return WatermarkStrategy
-            .<InputMessage>forBoundedOutOfOrderness(Duration.ofSeconds(5))
+            .<InputMessage>forBoundedOutOfOrderness(Duration.ofMinutes(15))
             .withIdleness(Duration.ofSeconds(1))
             .withTimestampAssigner((event, timestamp) -> {
                 return event.getDatetime().toInstant().toEpochMilli();
             })
-            .withWatermarkAlignment(
-                "group-1",                      // Alignment group name
-                Duration.ofSeconds(1),          // Max drift
-                Duration.ofSeconds(1)           // Update interval
-            );
+            // .withWatermarkAlignment(
+            //     "group-1",                      // Alignment group name
+            //     Duration.ofSeconds(1),          // Max drift
+            //     Duration.ofSeconds(1)           // Update interval
+            // )
+        ;
     }
 
     private static DataStream<InputMessage> getLocalMessages(StreamExecutionEnvironment env, int limit, String inputDataPath) throws IOException {

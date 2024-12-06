@@ -8,6 +8,9 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
@@ -74,13 +77,13 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         String topic = ctx.getCurrentKey().f1;
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
-        if (locationId != 3) {
-            return;
-        }
+        // if (locationId != 3) {
+        //     return;
+        // }
 
-        if (message.getDTrendId() != 1) {
-            return;
-        }
+        // if (message.getDTrendId() != 1) {
+        //     return;
+        // }
 
         if (!trendDetectorsMap.containsKey(locationId)) {
             trendDetectorsMap.put(locationId, new TrendDetector(locationId, topic, socketPath, trendStatsWindowMinutes));
@@ -89,6 +92,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         TrendDetector trendDetector = this.trendDetectorsMap.get(locationId);
         TrendDetector.ProcessingResult result = trendDetector.processMessage(message, ctx.timestamp());
         
+        String events = "";
+
         if (result != null ) {
             for (TrendDetected trend : result.getActivatedTrends()) {
                 // Map<String, Object> eventInfo = new HashMap<>();
@@ -103,6 +108,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
                 // debug.put("location_ids", trend.getDLocationIds());
                 // debug.put("trend_ids", trend.getDebugTrendIds());
                 // eventInfo.put("debug", debug);
+
+                events += " TREND_ACTIVATED ";
 
                 TrendEvent event = new TrendEvent(
                     EventType.TREND_ACTIVATED,
@@ -121,6 +128,9 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         }
 
         for (TrendDetected trend : result.getDeActivatedTrends()) {
+            
+            events += " TREND_DEACTIVATED ";
+
             TrendEvent event = new TrendEvent(
                 EventType.TREND_DEACTIVATED,
                 trend.getId(),
@@ -131,6 +141,20 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
             
             out.collect(event);
         }
+
+        // Files.write(
+        //     Paths.get("local_messages_5_min.csv"),
+        //     // Paths.get("kafka_messages_15_min.csv"),
+        //     String.format(
+        //         "%d, %d, %d, %s\n", 
+        //         ctx.timestamp(), 
+        //         ctx.timerService().currentWatermark(), 
+        //         ctx.timestamp() - ctx.timerService().currentWatermark(),
+        //         events
+        //     ).getBytes(),
+        //     StandardOpenOption.CREATE,
+        //     StandardOpenOption.APPEND
+        // );
     }
 
     @Override

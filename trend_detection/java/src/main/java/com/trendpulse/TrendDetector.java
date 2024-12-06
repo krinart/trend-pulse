@@ -37,6 +37,7 @@ public class TrendDetector {
     public static final int CLUSTERING_INTERVAL_SECONDS = 60;
     public static final int UNPROCESSED_MESSAGES_THRESHOLD = 20;
     public static final int KEEP_UNMATCHED_MESSAGES_MINUTES = 10;
+    public static final int KEEP_TRENS_ALIVE_MINUTES = 120;
 
     public TrendDetector(Integer locationID, String topic, String socketFilePath, int trendStatsWindowMinutes) {
         this.locationID = locationID;
@@ -116,7 +117,7 @@ public class TrendDetector {
 
         if (currentTime < 0 || trends.size() == 0) return deActivatedTrends;
 
-        long cutoffTime = currentTime - (KEEP_UNMATCHED_MESSAGES_MINUTES * 60 * 1000);
+        long cutoffTime = currentTime - (KEEP_TRENS_ALIVE_MINUTES * 60 * 1000);
 
         for (TrendDetected trend : trends.values()) {
 
@@ -124,6 +125,7 @@ public class TrendDetector {
                 // Set<Message>s = new HashSet<Message>(clusteredMessages);
                 // s.retainAll(trend.getMessages());
                 // System.out.println(this.locationID + " Remove trend with " + trend.getMessages().size() + " messages | clustered: " + s.size());
+                System.out.println("Remove trend:  " + trend.getId() + " - " + (cutoffTime - trend.getLastUpdate()));
                 clusteredMessages.removeAll(trend.getMessages());
                 unmatchedMessages.removeAll(trend.getMessages());
                 deActivatedTrends.add(trend);
