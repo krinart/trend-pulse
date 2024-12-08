@@ -16,23 +16,12 @@ import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.trendpulse.schema.TrendEvent;
-import com.trendpulse.schema.TrendStatsInfo;
-import com.trendpulse.schema.WindowStats;
-import com.trendpulse.TrendDetectionJob;
-import com.trendpulse.schema.EventType;
-import com.trendpulse.schema.GlobalTrendInfo;
-import com.trendpulse.schema.LocalTrendInfo;
-import com.trendpulse.schema.Point;
-import com.trendpulse.schema.TileStats;
-import com.trendpulse.schema.TrendDataEvent;
-import com.trendpulse.schema.TrendDataType;
-import com.trendpulse.schema.ZoomStats;
+import com.trendpulse.schema.*;
 
 
-public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEvent, Void> {
+public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEvent, TrendEvent> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TrendDetectionJob.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TrendStatsRouter.class);
 
     private static final ObjectMapper objectMapper = new ObjectMapper()
         .registerModule(new AvroModule())
@@ -55,7 +44,7 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
     }
     
     @Override
-    public void processElement(TrendEvent event, Context ctx, Collector<Void> out) throws Exception {
+    public void processElement(TrendEvent event, Context ctx, Collector<TrendEvent> out) throws Exception {
         
         if (event.getEventType() != EventType.TREND_STATS) {
             return;
@@ -122,6 +111,39 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
                 ctx.output(tileOutput, geoDataEvent);
             }
         }
+
+        out.collect(TrendEvent.newBuilder()
+            .setEventType(EventType.TREND_TILE_INDEX)
+            .setTrendId(trendId)
+            .setTopic(event.getTopic())
+            .setTrendInfo(event.getTrendInfo())
+            .setInfo(getTileIndex(windowStats.getGeoStats()))
+            .build()
+        );
+    }
+
+    private TileIndexInfo getTileIndex(List<ZoomStats> zoomStats) {
+        List<ZoomInfo> zoomInfoList = zoomStats.stream()
+            .<ZoomInfo>map(zoomStat -> 
+                ZoomInfo.newBuilder()
+                    .setZoom(String.valueOf(zoomStat.getZoom()))
+                    .setTiles(
+                        zoomStat.getStats().stream()
+                            .map(tileStat -> tileStat.getTileX() + "_" + tileStat.getTileY())
+                            .sorted()
+                            .collect(Collectors.toList())
+                    )
+                    .build()
+            )
+            .sorted((a, b) -> Integer.compare(
+                Integer.parseInt(a.getZoom().toString()), 
+                Integer.parseInt(b.getZoom().toString())
+            ))
+            .collect(Collectors.toList());
+
+        return TileIndexInfo.newBuilder()
+            .setTileIndex(zoomInfoList)
+            .build();
     }
 }
 

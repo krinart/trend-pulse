@@ -17,10 +17,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.azure.ai.openai.OpenAIClient;
+import com.azure.ai.openai.OpenAIClientBuilder;
+import com.azure.core.credential.AzureKeyCredential;
 import com.trendpulse.TrendDetector;
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.items.TrendDetected;
 import com.trendpulse.lib.TimeUtils;
+import com.trendpulse.lib.TrendNameGenerator;
 import com.trendpulse.schema.*;
 
 
@@ -33,6 +37,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
     private transient Map<Tuple2<Integer, String>, TrendDetector> trendDetectorsMap;
     private transient ListState<Long> scheduledWindows;
 
+    private transient TrendNameGenerator trendNameGenerator;
+
     public TrendDetectionProcessor(String socketPath, int trendStatsWindowMinutes) {
         this.socketPath = socketPath;
         this.trendStatsWindowMinutes = trendStatsWindowMinutes;
@@ -44,6 +50,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         this.scheduledWindows = getRuntimeContext().getListState(
             new ListStateDescriptor<>("scheduled_windows", Long.class)
         );
+
+        trendNameGenerator = new TrendNameGenerator();
     }
 
     private void scheduleWindowEndCallback(Context ctx, OffsetDateTime datetime) throws Exception {
@@ -95,15 +103,19 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
             for (TrendDetected trend : result.getActivatedTrends()) {
                 events += " TREND_ACTIVATED ";
 
+                List<CharSequence> keywords = new ArrayList<>(trend.getKeywords());
+                List<CharSequence> sampleMessages = trend.getMessages().stream().limit(10).map(m -> m.getText()).collect(Collectors.toList());
+
                 TrendEvent event = new TrendEvent(
                     EventType.TREND_ACTIVATED,
                     trend.getId(),
                     trend.getTopic(),
                     new LocalTrendInfo(trend.getLocationId()),
                     new TrendActivatedInfo(
-                        new ArrayList<>(trend.getKeywords()),
+                        trendNameGenerator.generateTrendName(keywords, sampleMessages),
+                        keywords,
                         Arrays.asList(ArrayUtils.toObject(trend.getCentroid())),
-                        trend.getMessages().stream().limit(10).map(m -> m.getText()).collect(Collectors.toList())
+                        sampleMessages
                     ))
                 ;
                 

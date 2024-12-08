@@ -8,7 +8,8 @@
       "symbols": [
         "TREND_ACTIVATED",
         "TREND_STATS",
-        "TREND_DEACTIVATED"
+        "TREND_DEACTIVATED",
+        "TREND_TILE_INDEX"
       ]
     },
     {
@@ -60,6 +61,7 @@
       "type": "record",
       "name": "TrendActivatedInfo",
       "fields": [
+        {"name": "name", "type": "string"},
         {"name": "keywords", "type": {"type": "array", "items": "string"}},
         {"name": "centroid", "type": {"type": "array", "items": "double"}},
         {"name": "sampleMessages", "type": {"type": "array", "items": "string"}}
@@ -91,6 +93,26 @@
     },
     {
       "type": "record",
+      "name": "TileIndexInfo",
+      "fields": [
+        {
+          "name": "tileIndex",
+          "type": {
+            "type": "array", 
+            "items": {
+              "name": "ZoomInfo",
+              "type": "record",
+              "fields": [
+                {"name": "zoom", "type": "string"},
+                {"name": "tiles", "type": {"type": "array", "items": "string"}}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "record",
       "name": "TrendEvent",
       "fields": [
         {"name": "eventType", "type": "EventType"},
@@ -102,7 +124,8 @@
           "type": [
             "null",
             "TrendActivatedInfo",
-            "TrendStatsInfo"
+            "TrendStatsInfo",
+            "TileIndexInfo"
           ]
         }
       ]

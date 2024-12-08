@@ -23,15 +23,12 @@ import com.azure.core.credential.AzureKeyCredential;
 import com.trendpulse.items.GlobalTrend;
 import com.trendpulse.items.LocalTrend;
 import com.trendpulse.items.Trend;
+import com.trendpulse.lib.TrendNameGenerator;
 import com.trendpulse.schema.*;
 
 public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence, TrendEvent, TrendEvent> {
     private static final double SIMILARITY_THRESHOLD = 0.8; // Cosine similarity threshold
-    private static String AZURE_OPENAI_ENDPOINT = "https://my-first-open-ai-service.openai.azure.com/";
-    private static String AZURE_OPENAI_KEY = "uClNQwvESsEPxSFhKKonjSfIa8KDKUsyzLo7wl0rHzSpTI2qd40fJQQJ99AKACYeBjFXJ3w3AAABACOGgkTy";
-    private transient OpenAIClient client;
-
-    private final Map<String, LocalTrend> localTrends = new HashMap<>();
+        private final Map<String, LocalTrend> localTrends = new HashMap<>();
     private final Map<String, GlobalTrend> globalTrends = new HashMap<>();
     
     // localTrendId -> globalTrend 
@@ -39,6 +36,8 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
     
     int trendStatsWindowMinutes;
     private transient ListState<Long> scheduledWindows;
+
+    private transient TrendNameGenerator trendNameGenerator;
 
     public TrendManagementProcessor(int trendStatsWindowMinutes) {
         this.trendStatsWindowMinutes = trendStatsWindowMinutes;
@@ -50,10 +49,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             new ListStateDescriptor<>("scheduled_windows", Long.class)
         );
 
-        client = new OpenAIClientBuilder()
-            .endpoint(AZURE_OPENAI_ENDPOINT)
-            .credential(new AzureKeyCredential(AZURE_OPENAI_KEY))
-            .buildClient();
+        trendNameGenerator = new TrendNameGenerator();
     }
 
     @Override
@@ -261,9 +257,9 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         double[] centroid = eventInfo.getCentroid().stream().mapToDouble(Double::doubleValue).toArray();;
         List<String> sampleMessages = eventInfo.getSampleMessages().stream().map(k -> k.toString()).collect(Collectors.toList());        
 
-        String name = locationId + "__" + generateTrendName(keywords, sampleMessages);
+        // String name = locationId + "__" + generateTrendName(keywords, sampleMessages);
 
-        return new LocalTrend(trendId, name, topic, keywords, centroid, locationId, sampleMessages);
+        return new LocalTrend(trendId, eventInfo.getName().toString(), topic, keywords, centroid, locationId, sampleMessages);
     }
 
     private void initializeGlobalTrend(Set<LocalTrend> trends) {
@@ -296,69 +292,4 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
-
-    private String generateTrendName(List<String> keywords, List<String> sampleMessages) {
-        String keywordsStr = keywords.stream()
-            .limit(5)
-            .collect(Collectors.joining(", "));
-        
-        // Get up to 10 sample messages
-        String messagesStr = sampleMessages.stream()
-            .limit(10)
-            .map(msg -> "- " + msg)
-            .collect(Collectors.joining("\n"));
-        
-        // Create the system prompt with actual data
-        String systemPrompt = "Generate a short name for the trend that people currently discuss on social media based on the following information:\n\n" + 
-                            "top 5 keywords: " + keywordsStr + "\n\n" + 
-                            "10 sampled messages:\n" + messagesStr + "\n\n" +
-                            "Requirements for the name:\n" +
-                            "1. Maximum 2-3 words (decide which one works best)\n" +
-                            "2. Should be descriptive but concise\n" +
-                            "3. Should capture the main topic or sentiment\n" +
-                            "4. Return ONLY the name, no explanations or quotes";
-
-        String userPrompt = "Generate the trend name:";
-
-        List<ChatRequestMessage> messages = Arrays.asList(
-            new ChatRequestSystemMessage(systemPrompt),
-            new ChatRequestUserMessage(userPrompt));
-        
-        ChatCompletionsOptions options = new ChatCompletionsOptions(messages)
-            .setTemperature(1.2)
-            .setMaxTokens(50)
-            .setN(1);
-    
-        try {
-            // Make the request
-            ChatCompletions response = client.getChatCompletions(
-                "gpt-35-turbo", 
-                options
-            );
-    
-            // Extract and clean the generated name
-            String generatedName = response.getChoices().get(0).getMessage().getContent();
-            
-            // Clean up the name (remove quotes, extra spaces, newlines)
-            generatedName = generatedName.replaceAll("[\"'.,]", "")  // Remove quotes/punctiation
-                                       .replaceAll("\\s+", " ")    // Normalize spaces
-                                       .trim();                    // Remove leading/trailing spaces
-            
-            // Set the generated name
-            return generatedName;
-            
-        } catch (Exception e) {
-            // If name generation fails, create a fallback name from keywords
-            String fallbackName = keywords.stream()
-                .limit(3)
-                .collect(Collectors.joining("_"));
-            
-                // Log the error
-            System.err.println("Failed to generate trend name: " + e.getMessage());
-
-            return fallbackName;
-        }
-    }
-
-    
 }

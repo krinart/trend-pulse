@@ -1,8 +1,7 @@
 package com.trendpulse;
 
 import org.apache.commons.cli.*;
-
-
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.functions.KeySelector;
@@ -22,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Properties;
 import java.time.Duration;
@@ -88,13 +88,20 @@ public class TrendDetectionJob {
 
         // Write output
         TrendStatsRouter statsRouter = new TrendStatsRouter();
-        DataStream<TrendDataWrittenEvent> localTrendsWrittenEvent = output(localTrendEvents, statsRouter);
-        DataStream<TrendDataWrittenEvent> globalTrendsWrittenEvent = output(globalTrendEvents, statsRouter);
+        Pair<DataStream<TrendEvent>, DataStream<TrendDataWrittenEvent>> localOutuput = output(localTrendEvents, statsRouter);
+        Pair<DataStream<TrendEvent>, DataStream<TrendDataWrittenEvent>> globalOutput = output(globalTrendEvents, statsRouter);
 
-        DataStream<TrendEvent> localGlobalTrendActivatedDeactvatedEvents = 
-            localTrendEvents.union(globalTrendEvents)
-            .filter(e -> e.getEventType() == EventType.TREND_ACTIVATED || e.getEventType() == EventType.TREND_DEACTIVATED);
+        DataStream<TrendDataWrittenEvent> localTrendsWrittenEvent = localOutuput.getRight();
+        DataStream<TrendDataWrittenEvent> globalTrendsWrittenEvent = globalOutput.getRight();
 
+        DataStream<TrendEvent> localGlobalTrendActivatedDeactvatedEvents = localTrendEvents
+            .union(globalTrendEvents, localOutuput.getLeft(), globalOutput.getLeft())
+            .filter(e -> 
+                e.getEventType() == EventType.TREND_ACTIVATED || 
+                e.getEventType() == EventType.TREND_DEACTIVATED || 
+                e.getEventType() == EventType.TREND_TILE_INDEX
+            );
+            
         DataStream<TrendDataWrittenEvent> trendsWrittenEvent = localTrendsWrittenEvent
             .union(globalTrendsWrittenEvent);
 
@@ -117,8 +124,8 @@ public class TrendDetectionJob {
         env.execute("Trend Detection Job");
     }
 
-    private static DataStream<TrendDataWrittenEvent> output(DataStream<TrendEvent> trendEvents, TrendStatsRouter statsRouter) {
-        SingleOutputStreamOperator<Void> routedStream = trendEvents
+    private static Pair<DataStream<TrendEvent>, DataStream<TrendDataWrittenEvent>> output(DataStream<TrendEvent> trendEvents, TrendStatsRouter statsRouter) {
+        SingleOutputStreamOperator<TrendEvent> routedStream = trendEvents
             .keyBy(e -> e.getTrendId())
             .process(statsRouter)
             .name("stats-router");
@@ -139,7 +146,7 @@ public class TrendDetectionJob {
             .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, true))
             .name("timeseries-writer");
 
-        return timeSeriesWriter.union(tilesWriter);
+        return Pair.of((DataStream<TrendEvent>) routedStream, timeSeriesWriter.union(tilesWriter));
     }
 
     private static Properties loadKafkaProperties() throws IOException {
