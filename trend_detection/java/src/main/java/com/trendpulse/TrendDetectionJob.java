@@ -35,9 +35,11 @@ import com.trendpulse.processors.TimeseriesWriter;
 import com.trendpulse.processors.TrendDetectionProcessor;
 import com.trendpulse.processors.TrendStatsRouter;
 import com.trendpulse.processors.TrendWriter;
+import com.trendpulse.processors.TrendsJsonSink;
 import com.trendpulse.processors.TrendManagementProcessor;
 import com.trendpulse.schema.TrendEvent;
 import com.trendpulse.schema.EventType;
+import com.trendpulse.schema.LocalTrendInfo;
 import com.trendpulse.schema.TrendDataWrittenEvent;
 
 public class TrendDetectionJob {
@@ -48,7 +50,7 @@ public class TrendDetectionJob {
     // /opt/flink/data/messages_rows.json
     static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows_with_id_v26_500.json";
     static String DEFAULT_SOCKET_PATH = "/tmp/embedding_server.sock";
-    static String DEFAULT_OUTPUT_PATH = "./output-2";
+    static String DEFAULT_OUTPUT_PATH = "./output";
     static int DEFAULT_LIMIT = 10;
 
     private static int trendStatsWindowMinutes = 5;
@@ -67,8 +69,8 @@ public class TrendDetectionJob {
         // DataStream<InputMessage> messagesFromKafka = getKafkaMessages(env);
 
         // Detect trends
-        DataStream<TrendEvent> trendEvents = getKafkaMessages(env)
-        // DataStream<TrendEvent> trendEvents = getLocalMessages(env, -1, DEFAULT_DATA_PATH)
+        // DataStream<TrendEvent> trendEvents = getKafkaMessages(env)
+        DataStream<TrendEvent> trendEvents = getLocalMessages(env, -1, DEFAULT_DATA_PATH)
             .keyBy(new KeySelector<InputMessage, Tuple2<Integer, String>>() {
                 @Override
                 public Tuple2<Integer, String> getKey(InputMessage message) {
@@ -89,12 +91,16 @@ public class TrendDetectionJob {
         DataStream<TrendDataWrittenEvent> localTrendsWrittenEvent = output(trendEvents, statsRouter);
         DataStream<TrendDataWrittenEvent> globalTrendsWrittenEvent = output(globalTrendEvents, statsRouter);
 
+        localTrendsWrittenEvent
+            .union(globalTrendsWrittenEvent)
+            .process(new TrendsJsonSink());
+
         // DEBUG: Print TREND_DEACTIVATED events
         trendEvents
             .filter(e -> e.getEventType() ==  EventType.TREND_DEACTIVATED)
             .map(event -> String.format(
                 "%s(%s, %s): %s", 
-                event.getEventType(), event.getTrendId(), event.getLocationId(), ""))
+                event.getEventType(), ((LocalTrendInfo) event.getTrendInfo()).getLocationId(), ""))
             .name("TREND_DEACTIVATED print ")
             .print();       
 
@@ -113,15 +119,15 @@ public class TrendDetectionJob {
         DataStream<TrendDataWrittenEvent> timeSeriesWriter = routedStream
             .getSideOutput(statsRouter.getTileOutput())
             .keyBy(e -> e.getTrendId())
-            .process(new TrendWriter(connectionString, "trend-pulse", ""))
-            // .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, false))
+            // .process(new TrendWriter(connectionString, "trend-pulse", ""))
+            .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, false))
             .name("tile-writer");
 
         DataStream<TrendDataWrittenEvent> tilesWriter = routedStream
             .getSideOutput(statsRouter.getTimeseriesOutput())
             .keyBy(e -> e.getTrendId())
-            .process(new TrendWriter(connectionString, "trend-pulse", ""))
-            // .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, true))
+            // .process(new TrendWriter(connectionString, "trend-pulse", ""))
+            .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, true))
             .name("timeseries-writer");
 
         return timeSeriesWriter.union(tilesWriter);

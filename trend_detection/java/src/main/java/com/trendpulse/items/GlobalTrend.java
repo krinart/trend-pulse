@@ -15,11 +15,12 @@ public class GlobalTrend implements Trend {
     private Set<LocalTrend> localTrends;
     private List<String> keywords;
     private double[] centroid;
-    private Integer locationId;
+    private ArrayList<Integer> locationIds = new ArrayList<>();
     Map<Instant, WindowStats> windowStats = new HashMap<>();
 
     public GlobalTrend(String id, Set<LocalTrend> localTrends) {
         this.id = id;
+
         this.localTrends = localTrends;
         
         // Combine keywords from all local trends
@@ -27,6 +28,7 @@ public class GlobalTrend implements Trend {
         for (LocalTrend trend : localTrends) {
             this.keywords.addAll(trend.getKeywords());
             this.topic = trend.getTopic();
+            this.locationIds.add(trend.getLocationId());
         }
 
         if (this.topic == null) {
@@ -130,7 +132,7 @@ public class GlobalTrend implements Trend {
     @Override public String getTopic() { return topic; }
     @Override public List<String> getKeywords() { return keywords; }
     @Override public double[] getCentroid() { return centroid; }
-    @Override public Integer getLocationId() { return locationId; }
+    public ArrayList<Integer> getLocationIds() { return locationIds; }
 
     public Set<LocalTrend> getLocalTrends() { return localTrends; }
     public void setName(String name) { this.name = name; }

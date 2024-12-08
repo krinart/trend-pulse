@@ -21,10 +21,7 @@ import com.trendpulse.TrendDetector;
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.items.TrendDetected;
 import com.trendpulse.lib.TimeUtils;
-import com.trendpulse.schema.TrendEvent;
-import com.trendpulse.schema.TrendStatsInfo;
-import com.trendpulse.schema.EventType;
-import com.trendpulse.schema.TrendActivatedInfo;
+import com.trendpulse.schema.*;
 
 
 public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer, String>, InputMessage, TrendEvent> {
@@ -81,9 +78,9 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         //     return;
         // }
 
-        // if (message.getDTrendId() != 1) {
-        //     return;
-        // }
+        if (message.getDTrendId() != 1) {
+            return;
+        }
 
         if (!trendDetectorsMap.containsKey(ctx.getCurrentKey())) {
             trendDetectorsMap.put(ctx.getCurrentKey(), new TrendDetector(locationId, topic, socketPath, trendStatsWindowMinutes));
@@ -101,8 +98,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
                 TrendEvent event = new TrendEvent(
                     EventType.TREND_ACTIVATED,
                     trend.getId(),
-                    trend.getLocationId(),
                     trend.getTopic(),
+                    new LocalTrendInfo(trend.getLocationId()),
                     new TrendActivatedInfo(
                         new ArrayList<>(trend.getKeywords()),
                         Arrays.asList(ArrayUtils.toObject(trend.getCentroid())),
@@ -120,8 +117,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
             TrendEvent event = new TrendEvent(
                 EventType.TREND_DEACTIVATED,
                 trend.getId(),
-                trend.getLocationId(),
                 trend.getTopic(),
+                new LocalTrendInfo(trend.getLocationId()),
                 null
             );
             
@@ -175,8 +172,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
                 TrendEvent event = new TrendEvent(
                     EventType.TREND_STATS,
                     trend.getId(),
-                    trend.getLocationId(),
                     trend.getTopic(),
+                    new LocalTrendInfo(trend.getLocationId()),
                     new TrendStatsInfo(trend.getStats().getWindowStats(windowStart))
                 );
 

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.dataformat.avro.AvroModule;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
@@ -20,6 +21,8 @@ import com.trendpulse.schema.TrendStatsInfo;
 import com.trendpulse.schema.WindowStats;
 import com.trendpulse.TrendDetectionJob;
 import com.trendpulse.schema.EventType;
+import com.trendpulse.schema.GlobalTrendInfo;
+import com.trendpulse.schema.LocalTrendInfo;
 import com.trendpulse.schema.Point;
 import com.trendpulse.schema.TileStats;
 import com.trendpulse.schema.TrendDataEvent;
@@ -71,10 +74,19 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
         timeseriesItem.put("timestamp", timestamp);
         timeseriesItem.put("count", windowStats.getCount());
 
-        trendId = event.getLocationId() + "__" + trendId;
+        Object trendInfo = event.getTrendInfo();
+        String prefix;
 
-        String timeSeriesPath = Paths.get(trendId, "timeseries.json").toString();
+        if (trendInfo instanceof LocalTrendInfo) {
+            prefix = String.valueOf(((LocalTrendInfo)trendInfo).getLocationId());
+        } else {
+            // prefix = ((GlobalTrendInfo) trendInfo).getLocations().stream().map(l -> String.valueOf(l.getLocationId())).collect(Collectors.joining(", "));
+            prefix = "global";
+        }
+
+        String timeSeriesPath = Paths.get(prefix + "__" + trendId, "timeseries.json").toString();
         // LOG.info("TrendStatsRouter: {}", timeSeriesPath);
+        System.out.println("timeSeriesPath: " + timeSeriesPath);
         TrendDataEvent timeseriesDataEvent = new TrendDataEvent(
             event.getTrendId(), 
             windowStats.getWindowStart(), 
@@ -94,10 +106,11 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
                 int tileY = tile.getTileY();
                 
                 String tilePath = String.format("%s/timeseries/%s/%d/%d_%d.json",
-                    trendId, timestamp, zoom, tileX, tileY);
+                    prefix + "__" + trendId, timestamp, zoom, tileX, tileY);
                 String tileData = objectMapper.writeValueAsString(tile.getSampledPoints());
                 
                 // LOG.info("TrendStatsRouter: {}", tilePath);
+                System.out.println("tilePath: " + tilePath);
                 TrendDataEvent geoDataEvent = new TrendDataEvent(
                     event.getTrendId(), 
                     windowStats.getWindowStart(), 

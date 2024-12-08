@@ -8,5 +8,4 @@ public interface Trend {
     String getTopic();
     List<String> getKeywords();
     double[] getCentroid();
-    Integer getLocationId();
 }

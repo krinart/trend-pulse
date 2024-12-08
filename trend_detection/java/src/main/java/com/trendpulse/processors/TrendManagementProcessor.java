@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -20,14 +21,9 @@ import com.azure.ai.openai.models.ChatRequestSystemMessage;
 import com.azure.ai.openai.models.ChatRequestUserMessage;
 import com.azure.core.credential.AzureKeyCredential;
 
-import com.trendpulse.schema.TrendEvent;
-import com.trendpulse.schema.TrendStatsInfo;
-import com.trendpulse.schema.WindowStats;
-import com.trendpulse.schema.EventType;
-import com.trendpulse.schema.TrendActivatedInfo;
-import com.trendpulse.items.GlobalTrend;
-import com.trendpulse.items.LocalTrend;
-import com.trendpulse.items.Trend;
+import com.trendpulse.items.*;
+import com.trendpulse.schema.*;
+import com.trendpulse.schema.Location;
 
 public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence, TrendEvent, TrendEvent> {
     private static final double SIMILARITY_THRESHOLD = 0.8; // Cosine similarity threshold
@@ -84,7 +80,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         String topic = event.getTopic().toString();
 
         // Initialize new local trend
-        LocalTrend newTrend = initializeLocalTrend(eventInfo, topic, trendId, event.getLocationId());
+        LocalTrend newTrend = initializeLocalTrend(eventInfo, topic, trendId, ((LocalTrendInfo) event.getTrendInfo()).getLocationId());
         // System.out.println("----------------------------------------");
         // System.out.println(Thread.currentThread().getName() + " - " + ctx.getCurrentKey() +  " - Incoming trend(" + newTrend.getId() + "): " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
         System.out.println("Incoming trend(" + newTrend.getId() + "): " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
@@ -228,8 +224,8 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             TrendEvent event = new TrendEvent(
                 EventType.TREND_STATS,
                 trend.getId(),
-                null,
                 trend.getTopic(),
+                new GlobalTrendInfo(trend.getLocationIds().stream().map(l -> new Location(l)).collect(Collectors.toList())),
                 new TrendStatsInfo(windowStats)
             );
 

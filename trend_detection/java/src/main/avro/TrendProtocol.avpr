@@ -67,12 +67,36 @@
     },
     {
       "type": "record",
+      "name": "LocalTrendInfo",
+      "fields": [
+        {"name": "locationId", "type": "int"}
+      ]
+    },
+    {
+      "type": "record",
+      "name": "GlobalTrendInfo",
+      "fields": [
+        {
+          "name": "locations",
+          "type": {
+            "type": "array",
+            "items": {
+              "name": "Location",
+              "type": "record",
+              "fields": [{"name": "locationId", "type": "int"}]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "record",
       "name": "TrendEvent",
       "fields": [
         {"name": "eventType", "type": "EventType"},
         {"name": "trendId", "type": "string"},
-        {"name": "locationId", "type": ["null", "int"], "default": null},
         {"name": "topic", "type": "string"},
+        {"name": "trendInfo", "type": ["LocalTrendInfo", "GlobalTrendInfo"]},
         {
           "name": "info",
           "type": [

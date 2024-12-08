@@ -35,7 +35,8 @@ public class LocalTrend implements Trend {
     @Override public String getTopic() { return topic; }
     @Override public List<String> getKeywords() { return keywords; }
     @Override public double[] getCentroid() { return centroid; }
-    @Override public Integer getLocationId() { return locationId; }
+    
+    public Integer getLocationId() { return locationId; }
 
     public Set<LocalTrend> getSimilarTrends() { return similarTrends; }
     public List<String> getSampleMessages() { return sampleMessages; }
