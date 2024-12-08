@@ -32,7 +32,7 @@ public class TrendsJsonSink extends CoProcessFunction<TrendEvent, TrendDataWritt
 
     private void processTrendActivated(TrendEvent event, Context ctx, Collector<Void> out) throws Exception {
         TrendActivatedInfo eventInfo = (TrendActivatedInfo) event.getInfo();
-        System.out.println("TrendsJsonSink.processTrendActivated: " + eventInfo.getName());
+        System.out.println("TrendsJsonSink.processTrendActivated: " + eventInfo.getName() + " - " + event.getTrendType());
     }
 
     private void processTileIndex(TrendEvent event, Context ctx, Collector<Void> out) throws Exception {

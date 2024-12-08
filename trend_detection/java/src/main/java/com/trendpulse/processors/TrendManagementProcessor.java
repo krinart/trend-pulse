@@ -108,6 +108,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             out.collect(new TrendEvent(
                 EventType.TREND_ACTIVATED,
                 globalTrend.getId(),
+                TrendType.TREND_TYPE_GLOBAL,
                 globalTrend.getTopic(),
                 new GlobalTrendInfo(globalTrend.getLocationIds().stream().map(l -> new Location(l)).collect(Collectors.toList())),
                 new TrendActivatedInfo(
@@ -208,6 +209,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             TrendEvent event = new TrendEvent(
                 EventType.TREND_STATS,
                 trend.getId(),
+                TrendType.TREND_TYPE_GLOBAL,
                 trend.getTopic(),
                 new GlobalTrendInfo(trend.getLocationIds().stream().map(l -> new Location(l)).collect(Collectors.toList())),
                 new TrendStatsInfo(windowStats)

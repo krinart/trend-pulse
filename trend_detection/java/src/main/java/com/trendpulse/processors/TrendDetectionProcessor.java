@@ -109,6 +109,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
                 TrendEvent event = new TrendEvent(
                     EventType.TREND_ACTIVATED,
                     trend.getId(),
+                    TrendType.TREND_TYPE_LOCAL,
                     trend.getTopic(),
                     new LocalTrendInfo(trend.getLocationId()),
                     new TrendActivatedInfo(
@@ -128,6 +129,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
             TrendEvent event = new TrendEvent(
                 EventType.TREND_DEACTIVATED,
                 trend.getId(),
+                TrendType.TREND_TYPE_LOCAL,
                 trend.getTopic(),
                 new LocalTrendInfo(trend.getLocationId()),
                 null
@@ -136,19 +138,19 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
             out.collect(event);
         }
 
-        Files.write(
-            // Paths.get("local_messages_5_min.csv"),
-            Paths.get("kafka_messages_4_partitions.csv"),
-            String.format(
-                "%d, %d, %d, %s\n", 
-                ctx.timestamp(), 
-                ctx.timerService().currentWatermark(), 
-                (ctx.timestamp() - ctx.timerService().currentWatermark()) / 1000 / 60,
-                events
-            ).getBytes(),
-            StandardOpenOption.CREATE,
-            StandardOpenOption.APPEND
-        );
+        // Files.write(
+        //     // Paths.get("local_messages_5_min.csv"),
+        //     Paths.get("kafka_messages_4_partitions.csv"),
+        //     String.format(
+        //         "%d, %d, %d, %s\n", 
+        //         ctx.timestamp(), 
+        //         ctx.timerService().currentWatermark(), 
+        //         (ctx.timestamp() - ctx.timerService().currentWatermark()) / 1000 / 60,
+        //         events
+        //     ).getBytes(),
+        //     StandardOpenOption.CREATE,
+        //     StandardOpenOption.APPEND
+        // );
     }
 
     @Override
@@ -183,6 +185,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
                 TrendEvent event = new TrendEvent(
                     EventType.TREND_STATS,
                     trend.getId(),
+                    TrendType.TREND_TYPE_LOCAL,
                     trend.getTopic(),
                     new LocalTrendInfo(trend.getLocationId()),
                     new TrendStatsInfo(trend.getStats().getWindowStats(windowStart))

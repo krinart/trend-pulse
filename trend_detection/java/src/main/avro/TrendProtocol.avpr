@@ -112,11 +112,20 @@
       ]
     },
     {
+      "type": "enum",
+      "name": "TrendType",
+      "symbols": [
+        "TREND_TYPE_LOCAL",
+        "TREND_TYPE_GLOBAL"
+      ]
+    },
+    {
       "type": "record",
       "name": "TrendEvent",
       "fields": [
         {"name": "eventType", "type": "EventType"},
         {"name": "trendId", "type": "string"},
+        {"name": "trendType", "type": "TrendType"},
         {"name": "topic", "type": "string"},
         {"name": "trendInfo", "type": ["LocalTrendInfo", "GlobalTrendInfo"]},
         {

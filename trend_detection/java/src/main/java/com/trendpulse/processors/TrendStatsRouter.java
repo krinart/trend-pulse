@@ -115,6 +115,7 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
         out.collect(TrendEvent.newBuilder()
             .setEventType(EventType.TREND_TILE_INDEX)
             .setTrendId(trendId)
+            .setTrendType(event.getTrendType())
             .setTopic(event.getTopic())
             .setTrendInfo(event.getTrendInfo())
             .setInfo(getTileIndex(windowStats.getGeoStats()))
