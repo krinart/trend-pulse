@@ -112,13 +112,13 @@ public class TrendDetectionJob {
             .setParallelism(1);
 
         // DEBUG: Print TREND_DEACTIVATED events
-        localTrendEvents
-            .filter(e -> e.getEventType() ==  EventType.TREND_DEACTIVATED)
-            .map(event -> String.format(
-                "%s(%s, %s): %s", 
-                event.getEventType(), ((LocalTrendInfo) event.getTrendInfo()).getLocationId(), ""))
-            .name("TREND_DEACTIVATED print ")
-            .print();       
+        // localTrendEvents
+        //     .filter(e -> e.getEventType() ==  EventType.TREND_DEACTIVATED)
+        //     .map(event -> String.format(
+        //         "%s(%s, %s): %s", 
+        //         event.getEventType(), ((LocalTrendInfo) event.getTrendInfo()).getLocationId(), ""))
+        //     .name("TREND_DEACTIVATED print ")
+        //     .print();       
 
         // Execute
         env.execute("Trend Detection Job");

@@ -80,9 +80,9 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         //     return;
         // }
 
-        if (message.getDTrendId() != 1) {
-            return;
-        }
+        // if (message.getDTrendId() != 1) {
+        //     return;
+        // }
 
         if (!trendDetectorsMap.containsKey(ctx.getCurrentKey())) {
             trendDetectorsMap.put(ctx.getCurrentKey(), new TrendDetector(locationId, topic, socketPath, trendStatsWindowMinutes));
