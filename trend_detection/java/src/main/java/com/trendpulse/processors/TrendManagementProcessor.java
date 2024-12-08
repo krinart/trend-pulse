@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -21,9 +20,10 @@ import com.azure.ai.openai.models.ChatRequestSystemMessage;
 import com.azure.ai.openai.models.ChatRequestUserMessage;
 import com.azure.core.credential.AzureKeyCredential;
 
-import com.trendpulse.items.*;
+import com.trendpulse.items.GlobalTrend;
+import com.trendpulse.items.LocalTrend;
+import com.trendpulse.items.Trend;
 import com.trendpulse.schema.*;
-import com.trendpulse.schema.Location;
 
 public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence, TrendEvent, TrendEvent> {
     private static final double SIMILARITY_THRESHOLD = 0.8; // Cosine similarity threshold

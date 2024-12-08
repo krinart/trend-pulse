@@ -86,7 +86,7 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
 
         String timeSeriesPath = Paths.get(prefix + "__" + trendId, "timeseries.json").toString();
         // LOG.info("TrendStatsRouter: {}", timeSeriesPath);
-        System.out.println("timeSeriesPath: " + timeSeriesPath);
+        // System.out.println("timeSeriesPath: " + timeSeriesPath);
         TrendDataEvent timeseriesDataEvent = new TrendDataEvent(
             event.getTrendId(), 
             windowStats.getWindowStart(), 
@@ -110,7 +110,7 @@ public class TrendStatsRouter extends KeyedProcessFunction<CharSequence, TrendEv
                 String tileData = objectMapper.writeValueAsString(tile.getSampledPoints());
                 
                 // LOG.info("TrendStatsRouter: {}", tilePath);
-                System.out.println("tilePath: " + tilePath);
+                // System.out.println("tilePath: " + tilePath);
                 TrendDataEvent geoDataEvent = new TrendDataEvent(
                     event.getTrendId(), 
                     windowStats.getWindowStart(), 

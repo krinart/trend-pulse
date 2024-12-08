@@ -70,7 +70,7 @@ public class TrendDetectionJob {
 
         // Detect trends
         // DataStream<TrendEvent> trendEvents = getKafkaMessages(env)
-        DataStream<TrendEvent> trendEvents = getLocalMessages(env, -1, DEFAULT_DATA_PATH)
+        DataStream<TrendEvent> localTrendEvents = getLocalMessages(env, -1, DEFAULT_DATA_PATH)
             .keyBy(new KeySelector<InputMessage, Tuple2<Integer, String>>() {
                 @Override
                 public Tuple2<Integer, String> getKey(InputMessage message) {
@@ -81,22 +81,31 @@ public class TrendDetectionJob {
             .name("Trend Detection");
 
         // Apply TrendManagementProcessor
-        DataStream<TrendEvent> globalTrendEvents = trendEvents
+        DataStream<TrendEvent> globalTrendEvents = localTrendEvents
             .keyBy(e -> e.getTopic())
             .process(new TrendManagementProcessor(trendStatsWindowMinutes))
             .name("Trend Management");
 
         // Write output
         TrendStatsRouter statsRouter = new TrendStatsRouter();
-        DataStream<TrendDataWrittenEvent> localTrendsWrittenEvent = output(trendEvents, statsRouter);
+        DataStream<TrendDataWrittenEvent> localTrendsWrittenEvent = output(localTrendEvents, statsRouter);
         DataStream<TrendDataWrittenEvent> globalTrendsWrittenEvent = output(globalTrendEvents, statsRouter);
 
-        localTrendsWrittenEvent
-            .union(globalTrendsWrittenEvent)
-            .process(new TrendsJsonSink());
+        DataStream<TrendEvent> localGlobalTrendActivatedDeactvatedEvents = 
+            localTrendEvents.union(globalTrendEvents)
+            .filter(e -> e.getEventType() == EventType.TREND_ACTIVATED || e.getEventType() == EventType.TREND_DEACTIVATED);
+
+        DataStream<TrendDataWrittenEvent> trendsWrittenEvent = localTrendsWrittenEvent
+            .union(globalTrendsWrittenEvent);
+
+        localGlobalTrendActivatedDeactvatedEvents
+            .connect(trendsWrittenEvent)
+            .process(new TrendsJsonSink())
+            .name("TrendsJsonSink")
+            .setParallelism(1);
 
         // DEBUG: Print TREND_DEACTIVATED events
-        trendEvents
+        localTrendEvents
             .filter(e -> e.getEventType() ==  EventType.TREND_DEACTIVATED)
             .map(event -> String.format(
                 "%s(%s, %s): %s", 
