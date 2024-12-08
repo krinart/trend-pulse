@@ -6,18 +6,17 @@ import org.apache.flink.util.Collector;
 
 import com.trendpulse.schema.TrendDataEvent;
 import com.trendpulse.schema.TrendDataWrittenEvent;
-import com.trendpulse.schema.TrendEvent;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 
-public class TimeseriesWriter extends KeyedProcessFunction<CharSequence, TrendDataEvent, TrendDataWrittenEvent> {
+public class LocalTrendsWriter extends KeyedProcessFunction<CharSequence, TrendDataEvent, TrendDataWrittenEvent> {
     
     private final String basePath;
     private final StandardOpenOption openOption;
     
-    public TimeseriesWriter(String basePath, boolean append) {
+    public LocalTrendsWriter(String basePath, boolean append) {
         this.basePath = basePath;
         if (append) {
             this.openOption = StandardOpenOption.APPEND;

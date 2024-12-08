@@ -31,7 +31,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trendpulse.items.InputMessage;
 import com.trendpulse.lib.InputMessageJsonDeserializer;
 import com.trendpulse.lib.LocationUtils;
-import com.trendpulse.processors.TimeseriesWriter;
+import com.trendpulse.processors.LocalTrendsWriter;
 import com.trendpulse.processors.TrendDetectionProcessor;
 import com.trendpulse.processors.TrendStatsRouter;
 import com.trendpulse.processors.TrendWriter;
@@ -136,14 +136,14 @@ public class TrendDetectionJob {
             .getSideOutput(statsRouter.getTileOutput())
             .keyBy(e -> e.getTrendId())
             // .process(new TrendWriter(connectionString, "trend-pulse", ""))
-            .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, false))
+            .process(new LocalTrendsWriter(DEFAULT_OUTPUT_PATH, false))
             .name("tile-writer");
 
         DataStream<TrendDataWrittenEvent> tilesWriter = routedStream
             .getSideOutput(statsRouter.getTimeseriesOutput())
             .keyBy(e -> e.getTrendId())
             // .process(new TrendWriter(connectionString, "trend-pulse", ""))
-            .process(new TimeseriesWriter(DEFAULT_OUTPUT_PATH, true))
+            .process(new LocalTrendsWriter(DEFAULT_OUTPUT_PATH, true))
             .name("timeseries-writer");
 
         return Pair.of((DataStream<TrendEvent>) routedStream, timeSeriesWriter.union(tilesWriter));
