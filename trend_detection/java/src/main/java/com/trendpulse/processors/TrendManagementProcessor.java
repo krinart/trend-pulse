@@ -5,25 +5,16 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
-import com.azure.ai.openai.OpenAIClient;
-import com.azure.ai.openai.OpenAIClientBuilder;
-import com.azure.ai.openai.models.ChatCompletions;
-import com.azure.ai.openai.models.ChatCompletionsOptions;
-import com.azure.ai.openai.models.ChatRequestMessage;
-import com.azure.ai.openai.models.ChatRequestSystemMessage;
-import com.azure.ai.openai.models.ChatRequestUserMessage;
-import com.azure.core.credential.AzureKeyCredential;
-
 import com.trendpulse.items.GlobalTrend;
 import com.trendpulse.items.LocalTrend;
 import com.trendpulse.items.Trend;
-import com.trendpulse.lib.TrendNameGenerator;
 import com.trendpulse.schema.*;
 
 public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence, TrendEvent, TrendEvent> {
@@ -37,8 +28,6 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
     int trendStatsWindowMinutes;
     private transient ListState<Long> scheduledWindows;
 
-    private transient TrendNameGenerator trendNameGenerator;
-
     public TrendManagementProcessor(int trendStatsWindowMinutes) {
         this.trendStatsWindowMinutes = trendStatsWindowMinutes;
     }
@@ -48,8 +37,6 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         this.scheduledWindows = getRuntimeContext().getListState(
             new ListStateDescriptor<>("scheduled_windows", Long.class)
         );
-
-        trendNameGenerator = new TrendNameGenerator();
     }
 
     @Override
@@ -77,25 +64,22 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
 
         // Initialize new local trend
         LocalTrend newTrend = initializeLocalTrend(eventInfo, topic, trendId, ((LocalTrendInfo) event.getTrendInfo()).getLocationId());
-        // System.out.println("----------------------------------------");
-        // System.out.println(Thread.currentThread().getName() + " - " + ctx.getCurrentKey() +  " - Incoming trend(" + newTrend.getId() + "): " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
         System.out.println("Incoming trend(" + newTrend.getId() + "): " + newTrend.getName() + " | time: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()).toString());
         
-        // First check global trends
+        // Check global trends
         List<TrendWithSimilarity> similarGlobalTrends = findSimilarTrends(
             new ArrayList<>(globalTrends.values()), 
             newTrend
         );
         
         if (!similarGlobalTrends.isEmpty() && similarGlobalTrends.get(0).similarity >= SIMILARITY_THRESHOLD) {
-            // System.out.println("Matched existing global trend");
             GlobalTrend mostSimilarGlobalTrend = (GlobalTrend) similarGlobalTrends.get(0).trend;
             localMergedTrends.put(newTrend.getId(), mostSimilarGlobalTrend);
             mostSimilarGlobalTrend.addLocalTrend(newTrend);
             return;
         }
 
-        // Then check local trends
+        // Check local trends
         List<TrendWithSimilarity> similarLocalTrends = findSimilarTrends(
             new ArrayList<>(localTrends.values()), 
             newTrend
@@ -109,8 +93,6 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             }
         }
 
-        // System.out.println("Matching existing local trends: " + matchingLocalTrends.size());
-
         // Update similar trends relationships
         for (LocalTrend similarTrend : matchingLocalTrends) {
             newTrend.addSimilarTrend(similarTrend);
@@ -121,7 +103,19 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         if (matchingLocalTrends.size() >= 2) { // 2 similar trends + new trend = 3 total
             System.out.println("New global trend initialized: " + Instant.ofEpochMilli(ctx.timerService().currentWatermark()));
             matchingLocalTrends.add(newTrend);
-            initializeGlobalTrend(matchingLocalTrends);
+            GlobalTrend globalTrend = initializeGlobalTrend(matchingLocalTrends);
+
+            out.collect(new TrendEvent(
+                EventType.TREND_ACTIVATED,
+                globalTrend.getId(),
+                globalTrend.getTopic(),
+                new GlobalTrendInfo(globalTrend.getLocationIds().stream().map(l -> new Location(l)).collect(Collectors.toList())),
+                new TrendActivatedInfo(
+                    "GLOBAL  -  " + globalTrend.getName(),
+                    new ArrayList<>(globalTrend.getKeywords()),
+                    Arrays.asList(ArrayUtils.toObject(globalTrend.getCentroid())),
+                    new ArrayList<>(globalTrend.getSampleMessages())
+                )));
         } else {
             // System.out.println("Stored as a local trend");
             // Store as local trend
@@ -200,9 +194,6 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         Instant windowEnd = Instant.ofEpochMilli(timestamp);
         Instant windowStart = windowEnd.minus(trendStatsWindowMinutes, ChronoUnit.MINUTES);
 
-        // System.out.println(Thread.currentThread().getName() + " " + ctx.getCurrentKey() + " onTimer: " + windowStart.toString());
-        // System.out.println(" onTimer: " + windowStart.toString());
-
         for (GlobalTrend trend : globalTrends.values()) {
 
             if (!trend.getTopic().contentEquals(ctx.getCurrentKey())) {
@@ -213,9 +204,6 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
             if (windowStats == null) {
                 continue;
             }
-
-            // System.out.println(Thread.currentThread().getName() + " " + ctx.getCurrentKey() + " Emitted - trend: " + trend.getId() + " | timestamp: " + windowStart.toString() );
-            // System.out.println("Emitted - trend: " + trend.getId() + " | timestamp: " + windowStart.toString() );
 
             TrendEvent event = new TrendEvent(
                 EventType.TREND_STATS,
@@ -262,7 +250,7 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         return new LocalTrend(trendId, eventInfo.getName().toString(), topic, keywords, centroid, locationId, sampleMessages);
     }
 
-    private void initializeGlobalTrend(Set<LocalTrend> trends) {
+    private GlobalTrend initializeGlobalTrend(Set<LocalTrend> trends) {
         String globalTrendId = UUID.randomUUID().toString();
         GlobalTrend globalTrend = new GlobalTrend(globalTrendId, trends);
         globalTrends.put(globalTrendId, globalTrend);
@@ -277,6 +265,8 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         for (LocalTrend trend : trends) {
             localTrends.remove(trend.getId());
         }
+
+        return globalTrend;
     }
 
     private double calculateCosineSimilarity(double[] vectorA, double[] vectorB) {

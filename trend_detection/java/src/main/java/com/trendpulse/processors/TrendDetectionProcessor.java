@@ -116,8 +116,7 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
                         keywords,
                         Arrays.asList(ArrayUtils.toObject(trend.getCentroid())),
                         sampleMessages
-                    ))
-                ;
+                    ));
                 
                 out.collect(event);
             }

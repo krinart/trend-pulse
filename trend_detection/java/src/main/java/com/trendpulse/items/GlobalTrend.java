@@ -15,8 +15,9 @@ public class GlobalTrend implements Trend {
     private Set<LocalTrend> localTrends;
     private List<String> keywords;
     private double[] centroid;
-    private ArrayList<Integer> locationIds = new ArrayList<>();
-    Map<Instant, WindowStats> windowStats = new HashMap<>();
+    private List<Integer> locationIds = new ArrayList<>();
+    private Map<Instant, WindowStats> windowStats = new HashMap<>();
+    private List<String> sampleMessages;
 
     public GlobalTrend(String id, Set<LocalTrend> localTrends) {
         this.id = id;
@@ -27,12 +28,10 @@ public class GlobalTrend implements Trend {
         this.keywords = new ArrayList<>();
         for (LocalTrend trend : localTrends) {
             this.keywords.addAll(trend.getKeywords());
-            this.topic = trend.getTopic();
             this.locationIds.add(trend.getLocationId());
-        }
-
-        if (this.topic == null) {
-            throw new IllegalStateException("Global trend has null topic");
+            this.topic = trend.getTopic();
+            this.name = trend.getName();
+            this.sampleMessages = trend.getSampleMessages();
         }
 
         initializeWindowStats();
@@ -132,7 +131,8 @@ public class GlobalTrend implements Trend {
     @Override public String getTopic() { return topic; }
     @Override public List<String> getKeywords() { return keywords; }
     @Override public double[] getCentroid() { return centroid; }
-    public ArrayList<Integer> getLocationIds() { return locationIds; }
+    public List<Integer> getLocationIds() { return locationIds; }
+    public List<String> getSampleMessages() {return sampleMessages; }
 
     public Set<LocalTrend> getLocalTrends() { return localTrends; }
     public void setName(String name) { this.name = name; }
