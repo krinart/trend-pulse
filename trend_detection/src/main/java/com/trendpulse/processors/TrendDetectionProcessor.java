@@ -5,8 +5,10 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Counter;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
+
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -24,7 +26,7 @@ import com.trendpulse.schema.*;
 
 public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer, String>, InputMessage, TrendEvent> {
 
-    private static final long serialVersionUID = 1L;
+    private transient Map<String, Counter> perKeyCounters;
 
     private final String socketPath;
     private final int trendStatsWindowMinutes;
@@ -46,6 +48,8 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         );
 
         trendNameGenerator = new TrendNameGenerator();
+
+        perKeyCounters = new HashMap<>();
     }
 
     private void scheduleWindowEndCallback(Context ctx, OffsetDateTime datetime) throws Exception {
@@ -75,6 +79,15 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         Integer locationId = ctx.getCurrentKey().f0;
         String topic = ctx.getCurrentKey().f1;
         scheduleWindowEndCallback(ctx, message.getDatetime());
+
+        perKeyCounters.computeIfAbsent(
+            locationId + "__" + topic, 
+            k -> getRuntimeContext()
+                    .getMetricGroup()
+                    .addGroup("TrendDetectionProcessor")
+                    .addGroup("key", k)
+                    .counter("records_processed")
+            ).inc();
 
         // if (locationId != 16) {
         //     return;
