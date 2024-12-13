@@ -130,7 +130,7 @@ public class TrendDetectionJob {
             .process(statsRouter)
             .name("stats-router");
             
-        String connectionString = "DefaultEndpointsProtocol=https;AccountName=trenddetection5811932626;AccountKey=Ihxo1OGV+3QBBdPVrfUnc3Zy9gRTJXzqmXyQQOhq6KWrwer8rS9g0ZfuZtlqxR4YiOEgDZToiIdJ+AStAJXqpw==;EndpointSuffix=core.windows.net";
+        String connectionString = "";
 
         DataStream<TrendDataWrittenEvent> timeSeriesWriter = routedStream
             .getSideOutput(statsRouter.getTileOutput())

@@ -16,7 +16,7 @@ import com.azure.core.credential.AzureKeyCredential;
 public class TrendNameGenerator {
 
     private static String AZURE_OPENAI_ENDPOINT = "https://my-first-open-ai-service.openai.azure.com/";
-    private static String AZURE_OPENAI_KEY = "uClNQwvESsEPxSFhKKonjSfIa8KDKUsyzLo7wl0rHzSpTI2qd40fJQQJ99AKACYeBjFXJ3w3AAABACOGgkTy";
+    private static String AZURE_OPENAI_KEY = "";
     private transient OpenAIClient client;
 
     public TrendNameGenerator() {

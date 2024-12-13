@@ -1,27 +1,86 @@
 services:
   jobmanager:
-    image: flink-python
-    build: .
+    image: flink:1.18.0-java11
     ports:
       - "8081:8081"
     command: jobmanager
-    volumes:
-      - ./:/opt/flink/work  # Map current directory to work directory
     environment:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
+        parallelism.default: 2
+    volumes:
+      - ./target:/opt/flink/usrlib
+      - ./data:/opt/flink/data
 
-  taskmanager:
-    image: flink-python
-    build: .
+  taskmanager-1:
+    image: flink:1.18.0-java11
     depends_on:
       - jobmanager
+      - embedding-server-1
     command: taskmanager
-    volumes:
-      - ./:/opt/flink/work  # Same mapping for taskmanager
     environment:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
+        taskmanager.memory.process.size: 2048m
+      - SOCKET_PATH=/tmp/embedding_server.sock
+    volumes:
+      - ./target:/opt/flink/usrlib
+      - embedding-sockets-1:/tmp
+      - ./data:/opt/flink/data
+
+  embedding-server-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    environment:
+      - SOCKET_PATH=/tmp/embedding_server.sock
+    volumes:
+      - embedding-sockets-1:/tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  taskmanager-2:
+    image: flink:1.18.0-java11
+    depends_on:
+      - jobmanager
+      - embedding-server-2
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2
+        taskmanager.memory.process.size: 2048m
+      - SOCKET_PATH=/tmp/embedding_server.sock
+    volumes:
+      - ./target:/opt/flink/usrlib
+      - embedding-sockets-2:/tmp
+      - ./data:/opt/flink/data
+
+  embedding-server-2:
+    image: java-embedding-server-1:latest
+    environment:
+      - SOCKET_PATH=/tmp/embedding_server.sock
+    volumes:
+      - embedding-sockets-2:/tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+volumes:
+  embedding-sockets-1:
+  embedding-sockets-2:
