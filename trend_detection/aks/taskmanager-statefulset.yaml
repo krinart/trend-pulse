@@ -82,6 +82,21 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: AZURE_BLOBSTORAGE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: trend-detection
+              key: AZURE_BLOBSTORAGE_CONNECTION_STRING
+        - name: AZURE_EVENTHUB_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: trend-detection
+              key: AZURE_EVENTHUB_CONNECTION_STRING
+        - name: AZURE_OPENAI_KEY
+          valueFrom:
+            secretKeyRef:
+              name: trend-detection
+              key: AZURE_OPENAI_KEY
       - name: embedding-server
         image: krinart.azurecr.io/embedding-server:latest
         lifecycle:

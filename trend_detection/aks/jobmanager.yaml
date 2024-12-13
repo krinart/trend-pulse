@@ -46,6 +46,21 @@ spec:
         env:
         - name: JOB_MANAGER_RPC_ADDRESS
           value: flink-jobmanager
+        - name: AZURE_BLOBSTORAGE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: trend-detection
+              key: AZURE_BLOBSTORAGE_CONNECTION_STRING
+        - name: AZURE_EVENTHUB_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: trend-detection
+              key: AZURE_EVENTHUB_CONNECTION_STRING
+        - name: AZURE_OPENAI_KEY
+          valueFrom:
+            secretKeyRef:
+              name: trend-detection
+              key: AZURE_OPENAI_KEY
 ---
 apiVersion: v1
 kind: Service

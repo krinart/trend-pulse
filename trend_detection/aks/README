@@ -38,10 +38,14 @@ kubectl exec -it $(kubectl get pod -l component=jobmanager -o jsonpath='{.items[
 
 kubectl get svc flink-jobmanager
 
-kubectl logs -f flink-jobmanager-68b7bf9649-vhgjd -c jobmanager
+kubectl logs -f flink-jobmanager-68b7bf9649-t8dxx -c jobmanager
 kubectl logs -f flink-taskmanager-0 -c taskmanager
 kubectl logs -f flink-taskmanager-0 -c embedding-server
 
 
 kubectl exec -it $(kubectl get pod -l component=jobmanager -o jsonpath='{.items[0].metadata.name}') -- flink list
 kubectl exec -it $(kubectl get pod -l component=jobmanager -o jsonpath='{.items[0].metadata.name}') -- flink cancel <job_id>
+
+
+
+kubectl create secret generic trend-detection --from-file=AZURE_BLOBSTORAGE_CONNECTION_STRING=aks/.env/AZURE_BLOBSTORAGE_CONNECTION_STRING --from-file=AZURE_EVENTHUB_CONNECTION_STRING=aks/.env/AZURE_EVENTHUB_CONNECTION_STRING --from-file=AZURE_OPENAI_KEY=aks/.env/AZURE_OPENAI_KEY
