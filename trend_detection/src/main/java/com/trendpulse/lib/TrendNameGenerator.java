@@ -16,13 +16,17 @@ import com.azure.core.credential.AzureKeyCredential;
 public class TrendNameGenerator {
 
     private static String AZURE_OPENAI_ENDPOINT = "https://my-first-open-ai-service.openai.azure.com/";
-    private static String AZURE_OPENAI_KEY = "";
     private transient OpenAIClient client;
 
     public TrendNameGenerator() {
+        String azureKey = System.getenv("AZURE_OPENAI_KEY");
+        if (azureKey == null) {
+            throw new IllegalStateException("AZURE_OPENAI_KEY is required");
+        }
+
         client = new OpenAIClientBuilder()
             .endpoint(AZURE_OPENAI_ENDPOINT)
-            .credential(new AzureKeyCredential(AZURE_OPENAI_KEY))
+            .credential(new AzureKeyCredential(azureKey))
             .buildClient();
     }
 

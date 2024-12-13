@@ -1,6 +1,5 @@
 package com.trendpulse;
 
-import org.apache.commons.cli.*;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -48,7 +47,7 @@ public class TrendDetectionJob {
     static final String CONSUMER_CONFIG_FILE_PATH = "consumer.config";
 
     // /opt/flink/data/messages_rows.json
-    static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/java/data/messages_rows_with_id_v26_500.json";
+    static String DEFAULT_DATA_PATH = "/Users/viktor/workspace/ds2/trend_detection/data/messages_rows_with_id_v26_500.json";
     static String DEFAULT_SOCKET_PATH = "/tmp/embedding_server.sock";
     static String DEFAULT_OUTPUT_PATH = "./output";
     static int DEFAULT_LIMIT = 10;
@@ -66,11 +65,9 @@ public class TrendDetectionJob {
         // env.setParallelism(1);
         env.getConfig().setAutoWatermarkInterval(50);
 
-        // DataStream<InputMessage> messagesFromKafka = getKafkaMessages(env);
-
-        // Detect trends
-        // DataStream<TrendEvent> trendEvents = getKafkaMessages(env)
-        DataStream<TrendEvent> localTrendEvents = getLocalMessages(env, -1, DEFAULT_DATA_PATH)
+        // Trends source
+        DataStream<TrendEvent> localTrendEvents = getKafkaMessages(env)
+        // DataStream<TrendEvent> localTrendEvents = getLocalMessages(env, -1, DEFAULT_DATA_PATH)
             .keyBy(new KeySelector<InputMessage, Tuple2<Integer, String>>() {
                 @Override
                 public Tuple2<Integer, String> getKey(InputMessage message) {
@@ -130,20 +127,24 @@ public class TrendDetectionJob {
             .process(statsRouter)
             .name("stats-router");
             
-        String connectionString = "";
+        
+        String connectionString = System.getenv("AZURE_BLOBSTORAGE_CONNECTION_STRING");
+        if (connectionString == null) {
+            throw new IllegalStateException("AZURE_BLOBSTORAGE_CONNECTION_STRING is required");
+        }
 
         DataStream<TrendDataWrittenEvent> timeSeriesWriter = routedStream
             .getSideOutput(statsRouter.getTileOutput())
             .keyBy(e -> e.getTrendId())
-            // .process(new TrendWriter(connectionString, "trend-pulse", ""))
-            .process(new LocalTrendsWriter(DEFAULT_OUTPUT_PATH, false))
+            .process(new TrendWriter(connectionString, "trend-pulse", ""))
+            // .process(new LocalTrendsWriter(DEFAULT_OUTPUT_PATH, false))
             .name("tile-writer");
 
         DataStream<TrendDataWrittenEvent> tilesWriter = routedStream
             .getSideOutput(statsRouter.getTimeseriesOutput())
             .keyBy(e -> e.getTrendId())
-            // .process(new TrendWriter(connectionString, "trend-pulse", ""))
-            .process(new LocalTrendsWriter(DEFAULT_OUTPUT_PATH, true))
+            .process(new TrendWriter(connectionString, "trend-pulse", ""))
+            // .process(new LocalTrendsWriter(DEFAULT_OUTPUT_PATH, true))
             .name("timeseries-writer");
 
         return Pair.of((DataStream<TrendEvent>) routedStream, timeSeriesWriter.union(tilesWriter));
@@ -157,17 +158,21 @@ public class TrendDetectionJob {
             try (FileInputStream input = new FileInputStream(configFile)) {
                 properties.load(input);
                 System.out.println("Loaded config from mounted file: " + configFile.getAbsolutePath());
-                return properties;
+            }
+        } else {
+            try (InputStream input = TrendDetectionJob.class.getClassLoader().getResourceAsStream(CONSUMER_CONFIG_FILE_PATH)) {
+                if (input == null) {
+                    throw new IOException("Unable to find consumer.config on classpath");
+                }
+                properties.load(input);
             }
         }
 
-        // Use getResourceAsStream instead of FileReader
-        try (InputStream input = TrendDetectionJob.class.getClassLoader().getResourceAsStream(CONSUMER_CONFIG_FILE_PATH)) {
-            if (input == null) {
-                throw new IOException("Unable to find consumer.config on classpath");
-            }
-            properties.load(input);
+        String connectionString = System.getenv("AZURE_EVENTHUB_CONNECTION_STRING");
+        if (connectionString == null) {
+            throw new IllegalStateException("AZURE_EVENTHUB_CONNECTION_STRING is required");
         }
+        properties.setProperty("sasl.jaas.config", connectionString);
 
         return properties;
     }
