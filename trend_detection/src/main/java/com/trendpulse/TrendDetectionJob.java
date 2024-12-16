@@ -43,7 +43,8 @@ import com.trendpulse.schema.TrendDataWrittenEvent;
 
 public class TrendDetectionJob {
     
-    static final String TOPIC = "input-messages-v26-2p";
+    // static final String TOPIC = "input-messages-v26-2p";
+    static final String TOPIC = "input-messages-tech-14";
     static final String CONSUMER_CONFIG_FILE_PATH = "consumer.config";
 
     // /opt/flink/data/messages_rows.json
@@ -68,6 +69,9 @@ public class TrendDetectionJob {
         // Trends source
         DataStream<TrendEvent> localTrendEvents = getKafkaMessages(env)
         // DataStream<TrendEvent> localTrendEvents = getLocalMessages(env, -1, DEFAULT_DATA_PATH)
+            
+            // .filter(e -> e.getTopic().equals("TECH")&& e.getLocationId() == 14)
+        
             .keyBy(new KeySelector<InputMessage, Tuple2<Integer, String>>() {
                 @Override
                 public Tuple2<Integer, String> getKey(InputMessage message) {

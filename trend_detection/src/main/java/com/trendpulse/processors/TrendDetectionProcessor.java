@@ -5,15 +5,18 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.metrics.Counter;
+import org.apache.flink.dropwizard.metrics.DropwizardHistogramWrapper;
+import org.apache.flink.metrics.Histogram;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
+import com.codahale.metrics.SlidingTimeWindowReservoir;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.trendpulse.TrendDetector;
@@ -23,10 +26,9 @@ import com.trendpulse.lib.TimeUtils;
 import com.trendpulse.lib.TrendNameGenerator;
 import com.trendpulse.schema.*;
 
-
 public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer, String>, InputMessage, TrendEvent> {
 
-    private transient Map<String, Counter> perKeyCounters;
+    private transient Histogram latencyHistogram;
 
     private final String socketPath;
     private final int trendStatsWindowMinutes;
@@ -49,7 +51,11 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
 
         trendNameGenerator = new TrendNameGenerator();
 
-        perKeyCounters = new HashMap<>();
+        com.codahale.metrics.Histogram dropwizardHistogram =
+            new com.codahale.metrics.Histogram(new SlidingTimeWindowReservoir(60, TimeUnit.SECONDS));
+        latencyHistogram = getRuntimeContext()
+            .getMetricGroup()
+            .histogram("embedding_server_call_latency", new DropwizardHistogramWrapper(dropwizardHistogram));
     }
 
     private void scheduleWindowEndCallback(Context ctx, OffsetDateTime datetime) throws Exception {
@@ -80,15 +86,6 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         String topic = ctx.getCurrentKey().f1;
         scheduleWindowEndCallback(ctx, message.getDatetime());
 
-        perKeyCounters.computeIfAbsent(
-            locationId + "__" + topic, 
-            k -> getRuntimeContext()
-                    .getMetricGroup()
-                    .addGroup("TrendDetectionProcessor")
-                    .addGroup("key", k)
-                    .counter("records_processed")
-            ).inc();
-
         // if (locationId != 16) {
         //     return;
         // }
@@ -102,8 +99,14 @@ public class TrendDetectionProcessor extends KeyedProcessFunction<Tuple2<Integer
         }
 
         TrendDetector trendDetector = this.trendDetectorsMap.get(ctx.getCurrentKey());
-        TrendDetector.ProcessingResult result = trendDetector.processMessage(message, ctx.timestamp());
         
+        long startTime = System.nanoTime();
+        
+        TrendDetector.ProcessingResult result = trendDetector.processMessage(message, ctx.timestamp());
+
+        long latency = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime);
+        latencyHistogram.update(latency);
+
         String events = "";
 
         if (result != null ) {

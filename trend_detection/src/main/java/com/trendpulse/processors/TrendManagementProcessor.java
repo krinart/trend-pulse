@@ -9,7 +9,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.metrics.Counter;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
@@ -19,8 +18,6 @@ import com.trendpulse.items.Trend;
 import com.trendpulse.schema.*;
 
 public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence, TrendEvent, TrendEvent> {
-
-    private transient Map<String, Counter> perKeyCounters;
 
     private static final double SIMILARITY_THRESHOLD = 0.8; // Cosine similarity threshold
         private final Map<String, LocalTrend> localTrends = new HashMap<>();
@@ -41,21 +38,10 @@ public class TrendManagementProcessor extends KeyedProcessFunction<CharSequence,
         this.scheduledWindows = getRuntimeContext().getListState(
             new ListStateDescriptor<>("scheduled_windows", Long.class)
         );
-
-        perKeyCounters = new HashMap<>();
     }
 
     @Override
     public void processElement(TrendEvent event, Context ctx, Collector<TrendEvent> out) throws Exception {
-        perKeyCounters.computeIfAbsent(
-            ctx.getCurrentKey().toString(), 
-            k -> getRuntimeContext()
-                    .getMetricGroup()
-                    .addGroup("TrendManagementProcessor")
-                    .addGroup("key", k)
-                    .counter("records_processed")
-            ).inc();
-
         switch (event.getEventType()) {
             case TREND_ACTIVATED : {
                 processTrendActivated(event, ctx, out);
