@@ -93,7 +93,7 @@ export class MapComponent implements OnInit, OnDestroy {
   }
 
   private initializeMap(): Promise<void> {
-    mapboxgl.accessToken = 'pk.eyJ1Ijoia3JpbmFydCIsImEiOiJjbTNocGk4bzkwamw4MmtxMmgxbml6M3p3In0.kuos_MirrbMB46W84RJTqQ';
+    mapboxgl.accessToken = 'pk.eyJ1Ijoia3JpbmFydCIsImEiOiJjbTh6M3Rhc2cwN3RkMnJvYzJ4eHIyMnBmIn0.EaEZQyNtl9GN4eL9GqUT4Q';
 
     this.map = new mapboxgl.Map({
       container: 'map',
@@ -282,6 +282,21 @@ export class MapComponent implements OnInit, OnDestroy {
     this.selectedLocationId = locationID;
     this.updateTrends();
     this.clearMarkers();
+    console.log(`selected location: ${locationID}`);
+    console.log(`filtered global trends: ${this.filteredGlobalTrends}`);
+    console.log(`filtered local trends: ${this.filteredLocalTrends}`);
+
+    if (this.filteredGlobalTrends.length > 0) {
+      this.onTrendClick(this.filteredGlobalTrends[0]);
+    } else if (this.filteredLocalTrends.length > 0) {
+      this.onTrendClick(this.filteredLocalTrends[0]);
+    }
+
+
+    // for (const t of this.trendsMap) {
+    //   console.log(t);
+    // }
+    
   }
 
   resetLocation() {

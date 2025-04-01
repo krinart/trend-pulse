@@ -17,8 +17,8 @@ export class FetchService {
   fileCache: {[key: string]: any} = {};
   private FOLDER_NAME = 'v21';
 
-  BASE_URL = "http://localhost:3000";
-  TRENDS_URL = `${this.BASE_URL}/assets/data/${this.FOLDER_NAME}/trends.json`;
+  BASE_URL = "/";
+  TRENDS_URL = `${this.BASE_URL}data/${this.FOLDER_NAME}/trends.json`;
 
   getCurrentTrends(): Promise<Trend[]> {
     return firstValueFrom(

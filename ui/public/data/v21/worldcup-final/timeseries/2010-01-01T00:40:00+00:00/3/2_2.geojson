@@ -1,0 +1,1 @@
+{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-87.69307015002857, 41.801855495361465]}, "properties": {"intensity": 0.9082091274062449, "ts": "2010-01-01T00:40:00+00:00"}}]}
