@@ -1,10 +1,10 @@
-# DS2: Social Media Trend Detection System
+# Trend-Pulse: Social Media Trend Detection System
 
 A demonstration platform showcasing real-time trend detection from social media streams using AI-based analysis techniques.
 
 ## Overview
 
-DS2 processes streams of social media posts to identify emerging trends based on semantic similarity and message volume. The system performs multi-level trend analysis, detecting both local trends (specific to geographic areas) and global trends (spanning multiple locations).
+Trend-Pulse processes streams of social media posts to identify emerging trends based on semantic similarity and message volume. The system performs multi-level trend analysis, detecting both local trends (specific to geographic areas) and global trends (spanning multiple locations).
 
 ## Key Features
 
