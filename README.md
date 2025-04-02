@@ -2,6 +2,8 @@
 
 A demonstration platform showcasing real-time trend detection from social media streams using AI-based analysis techniques.
 
+[View Live Demo](http://krinart.github.io/trend-pulse)
+
 ## Overview
 
 Trend-Pulse processes streams of social media posts to identify emerging trends based on semantic similarity and message volume. The system performs multi-level trend analysis, detecting both local trends (specific to geographic areas) and global trends (spanning multiple locations).
