@@ -93,8 +93,9 @@ export class MapComponent implements OnInit, OnDestroy {
   }
 
   private initializeMap(): Promise<void> {
-    mapboxgl.accessToken = 'pk.eyJ1Ijoia3JpbmFydCIsImEiOiJjbTh6M3Rhc2cwN3RkMnJvYzJ4eHIyMnBmIn0.EaEZQyNtl9GN4eL9GqUT4Q';
+    mapboxgl.accessToken = 'pk.eyJ1Ijoia3JpbmFydCIsImEiOiJjbWMxZDRyNDUwYnkxMm5wdXczZ3Z0bTlvIn0.S5uYNkDvxY6UqlYOmLx6Qw';
 
+    console.log(123);
     this.map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/mapbox/streets-v11',
@@ -102,6 +103,7 @@ export class MapComponent implements OnInit, OnDestroy {
       zoom: this.DEFAULT_ZOOM,
       renderWorldCopies: false
     });
+    console.log(321);
 
     this.map.on('moveend', () => {
       const zoom = Math.floor(this.map.getZoom());

@@ -17,7 +17,7 @@ export class FetchService {
   fileCache: {[key: string]: any} = {};
   private FOLDER_NAME = 'v21';
 
-  BASE_URL = "/trend-pulse/";
+  BASE_URL = "/";
   TRENDS_URL = `${this.BASE_URL}data/${this.FOLDER_NAME}/trends.json`;
 
   getCurrentTrends(): Promise<Trend[]> {
@@ -45,8 +45,11 @@ export class FetchService {
   }
 
   getTrendTimeseries(trend: Trend): Promise<TimePoint[]> {
+
+    console.log(`/${trend.timeseriesURL}`);
+
       return firstValueFrom(
-        this.http.get<TimePoint[]>(`${this.BASE_URL}/${trend.timeseriesURL}`)
+        this.http.get<TimePoint[]>(`/${trend.timeseriesURL}`)
         )
           .then(data => data.sort((a, b) => 
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
@@ -57,6 +60,7 @@ export class FetchService {
 
   getTileUrl(trend: Trend, zoom: number, x: number, y: number, timestamp?: string): string {
     const basePath = trend.tile_dir;
+    console.log(basePath);
     if (timestamp) {
       return `${basePath}/timeseries/${timestamp}/${zoom}/${x}_${y}.geojson`;
     }
@@ -71,7 +75,7 @@ export class FetchService {
       return this.tileCache[cacheKey];
     }
 
-    const tileUrl = `${this.BASE_URL}/${tilePath}`
+    const tileUrl = `/${tilePath}`
 
     try {
       const response = await firstValueFrom(this.http.get(tileUrl));
